@@ -36,7 +36,7 @@ Aplikasi ini menggunakan nominal simulasi. MVP tidak memproses uang nyata, pemba
 - Sequelize ORM
 - PostgreSQL
 - JWT untuk autentikasi (expiry 7 hari)
-- bcrypt untuk hash password
+- bcryptjs untuk hash password
 - OpenAI API (`gpt-4o-mini`) via raw HTTP call untuk fitur AI
 - Jest dan Supertest untuk testing
 

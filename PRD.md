@@ -44,7 +44,7 @@ Buyer mengirim pertanyaan → backend mengambil fakta produk dan snapshot lelang
 ### FR-01 — Autentikasi
 - Register menggunakan username, email, dan password.
 - Email unik dan dinormalisasi menjadi lowercase.
-- Password disimpan sebagai hash bcrypt, bukan plaintext.
+- Password disimpan sebagai hash bcryptjs, bukan plaintext.
 - Login menghasilkan JWT.
 - `GET /users/me` digunakan untuk memvalidasi sesi ketika halaman di-refresh.
 
