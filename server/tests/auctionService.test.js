@@ -92,12 +92,13 @@ describe('auction service lifecycle and permissions', () => {
     await expect(service.update(12, 5, { minIncrement: 2 })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
-  test('starts atomically using server time, sets deadline, and advances version', async () => {
+  test.each([86400, 259200, 604800])('starts a %i-second auction using server time and sets the exact deadline', async (durationSeconds) => {
     const { service, auction } = setup();
+    auction.durationSeconds = durationSeconds;
     const now = new Date('2026-01-01T00:00:00.000Z');
     await service.start(12, 5, now);
     expect(auction.startsAt.toISOString()).toBe(now.toISOString());
-    expect(auction.endsAt.toISOString()).toBe('2026-01-01T00:01:00.000Z');
+    expect(auction.endsAt.getTime() - auction.startsAt.getTime()).toBe(durationSeconds * 1000);
     expect(auction.status).toBe('live');
     expect(auction.version).toBe(1);
     await expect(service.start(12, 5, now)).rejects.toMatchObject({ status: 409, code: 'AUCTION_NOT_DRAFT' });

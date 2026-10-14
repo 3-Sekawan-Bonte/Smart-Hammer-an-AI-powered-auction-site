@@ -304,8 +304,8 @@ function validateAuctionBody(body, isUpdate = false) {
     }
   }
   if ((!isUpdate || Object.hasOwn(body, 'durationSeconds')) &&
-      (!Number.isSafeInteger(body.durationSeconds) || body.durationSeconds < 60 || body.durationSeconds > 86400)) {
-    fields.durationSeconds = 'Durasi harus integer 60–86400 detik.';
+      (!Number.isSafeInteger(body.durationSeconds) || body.durationSeconds < 60 || body.durationSeconds > 604800)) {
+    fields.durationSeconds = 'Durasi harus integer 60–604800 detik.';
   }
   if (!isUpdate || Object.hasOwn(body, 'productFacts')) {
     const facts = body.productFacts;

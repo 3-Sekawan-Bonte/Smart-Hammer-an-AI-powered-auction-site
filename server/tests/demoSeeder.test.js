@@ -76,7 +76,7 @@ describe('demo database seeder', () => {
       expect(auction.startingPrice).toBeGreaterThan(0);
       expect(auction.startingPrice).toBeLessThanOrEqual(2_000_000_000);
       expect(auction.durationSeconds).toBeGreaterThanOrEqual(60);
-      expect(auction.durationSeconds).toBeLessThanOrEqual(86400);
+      expect(auction.durationSeconds).toBeLessThanOrEqual(604800);
       expect(Object.keys(auction.productFacts).sort()).toEqual(['accessories', 'defects', 'specifications', 'warranty']);
       expect(Array.isArray(auction.productFacts.accessories)).toBe(true);
     }

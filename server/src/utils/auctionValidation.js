@@ -5,6 +5,7 @@ const CREATE_FIELDS = ['title', 'description', 'condition', 'category', 'product
 const FACT_FIELDS = ['specifications', 'defects', 'accessories', 'warranty'];
 const PROTECTED_FIELDS = ['sellerId', 'userId', 'currentPrice', 'status', 'startsAt', 'endsAt', 'highestBidderId', 'winnerId', 'version'];
 const MAX_PRICE = 2_000_000_000;
+const MAX_DURATION_SECONDS = 604_800;
 const FACT_LIMITS = { specifications: 2000, defects: 1000, warranty: 500 };
 
 function invalid(fields, message = 'Request validation failed.') {
@@ -98,7 +99,7 @@ function validateAuctionInput(body, { partial = false } = {}) {
   }
   if (!partial || Object.hasOwn(body, 'durationSeconds')) {
     const value = body.durationSeconds;
-    if (!Number.isInteger(value) || value < 60 || value > 86400) fields.durationSeconds = 'Must be an integer from 60 to 86400.';
+    if (!Number.isInteger(value) || value < 60 || value > MAX_DURATION_SECONDS) fields.durationSeconds = `Must be an integer from 60 to ${MAX_DURATION_SECONDS}.`;
     else result.durationSeconds = value;
   }
   if (Object.keys(fields).length) invalid(fields);

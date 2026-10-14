@@ -58,12 +58,13 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Buat `GET /auctions/:id` untuk snapshot.
 - [x] Buat `PATCH /auctions/:id` untuk edit draft oleh pemilik.
 - [x] Buat `POST /auctions/:id/start`.
-- [x] Terapkan validasi field, harga integer, durasi, category dari daftar subkategori (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`), dan URL gambar HTTPS.
+- [x] Terapkan validasi field, harga integer, durasi 60–604800 detik, category dari daftar subkategori (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`), dan URL gambar HTTPS.
 - [x] Pastikan draft tidak dapat diakses user lain.
 - [x] Implementasikan `DELETE /auctions/:id` untuk menghapus draft milik sendiri.
 - [x] Implementasikan query params `status`, `category`, `seller=me`, dan `search` pada `GET /auctions`.
 - [x] Gunakan serializer konsisten untuk objek Auction di REST dan Socket.IO.
 - [x] Tambahkan tests permission dan lifecycle.
+- [ ] Jalankan tes API berbasis database untuk create, edit draft, dan start dengan durasi 1, 3, dan 7 hari setelah konfigurasi database test tersedia.
 
 **Checkpoint:** seller dapat membuat draft, melihatnya, mengeditnya, dan memulai lelang.
 
@@ -166,6 +167,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Cocokkan register/login/session restore dengan `POST /users/register`, `POST /users/login`, dan `GET /users/me`; frontend menerima JWT `accessToken` backend.
 - [x] Integrasikan listing, pagination, pencarian, filter, detail, draft create/edit/delete, start, dan seller listing `seller=me`.
 - [x] Gunakan kategori backend yang diizinkan dan kirim field `category` dari form.
+- [x] Tawarkan pilihan durasi 1, 3, dan 7 hari; kirim integer detik dan pertahankan pilihan saat draft diedit.
 - [x] Cocokkan respons bid/idempotency, tampilkan minimum bid dari state backend, dan sediakan `GET /auctions/:id/bids` terpaginasikan tanpa membocorkan idempotency key.
 - [x] Cocokkan Product Q&A dan riwayat AI dengan API; Q&A privat per pemilik, sedangkan commentary Auctioneer tetap publik.
 - [x] Konfigurasikan URL API/Socket.IO frontend, CORS Express, dan CORS Socket.IO memakai origin yang dikonfigurasi.

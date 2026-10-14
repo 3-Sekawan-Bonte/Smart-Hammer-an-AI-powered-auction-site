@@ -105,7 +105,7 @@ Arus backend yang diutamakan: `Route → Middleware → Controller → Service �
 | `startingPrice` | Integer rupiah positif |
 | `currentPrice` | Awalnya sama dengan `startingPrice` |
 | `minIncrement` | Integer rupiah positif |
-| `durationSeconds` | Integer tervalidasi, 60–86400 detik |
+| `durationSeconds` | Integer tervalidasi, 60–604800 detik; form menawarkan 86400 (1 hari), 259200 (3 hari), atau 604800 (7 hari) |
 | `startsAt`, `endsAt` | Waktu server; null saat draft, diisi saat mulai |
 | `status` | `draft`, `live`, `ended` |
 | `highestBidderId` | FK ke `Users.id`, nullable |
