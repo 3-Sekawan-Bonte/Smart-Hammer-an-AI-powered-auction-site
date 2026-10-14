@@ -65,7 +65,7 @@ export default function AuthPage({ mode }) {
         <div className="auth-art-content">
           <p className="eyebrow amber-text">Smart Hammer membership</p>
           <h1 className="display">Masuk ke<br />arena lelang.</h1>
-          <p>Masuk untuk menjelajahi data lelang demo dan menyimpan draft lokal. FE-01 belum mengaktifkan bidding, AI, atau realtime.</p>
+      <p>Masuk untuk menjelajahi lelang demo dan mengikuti sinkronisasi room lokal. Event bid dan AI hanya simulasi development.</p>
         </div>
       </section>
       <section className="auth-panel">
