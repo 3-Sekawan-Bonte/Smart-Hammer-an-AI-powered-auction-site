@@ -26,7 +26,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Definisikan relasi Sequelize dan alias `seller`, `highestBidder`, `winner`, `bidder`, `auction`, serta AI interactions.
 - [ ] Tambahkan constraint/index yang diperlukan.
 - [x] Siapkan seed akun demo dan beberapa draft produk dengan fakta yang jelas.
-- [ ] Verifikasi migration dan seed dapat dijalankan melalui workflow project.
+- [x] Verifikasi migration dan seed dapat dijalankan melalui workflow project.
 
 **Checkpoint:** model, relasi, migration, dan seed dapat digunakan oleh service.
 

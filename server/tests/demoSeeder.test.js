@@ -8,6 +8,7 @@ function fakeQueryInterface({ users = [], auctions = [] } = {}) {
     nextUserId: Math.max(0, ...users.map(({ id }) => id || 0)) + 1,
     nextAuctionId: Math.max(0, ...auctions.map(({ id }) => id || 0)) + 1,
     transactionCount: 0,
+    bulkInsertInputs: [],
   };
   const sequelize = {
     async transaction(callback) {
@@ -27,9 +28,12 @@ function fakeQueryInterface({ users = [], auctions = [] } = {}) {
   const queryInterface = {
     sequelize,
     async bulkInsert(table, rows) {
+      state.bulkInsertInputs.push({ table, rows: rows.map((row) => ({ ...row })) });
       const target = table === 'Users' ? state.users : state.auctions;
       for (const row of rows) {
-        target.push({ id: table === 'Users' ? state.nextUserId++ : state.nextAuctionId++, ...row });
+        const storedRow = { ...row };
+        if (table === 'Auctions' && typeof storedRow.productFacts === 'string') storedRow.productFacts = JSON.parse(storedRow.productFacts);
+        target.push({ id: table === 'Users' ? state.nextUserId++ : state.nextAuctionId++, ...storedRow });
       }
     },
   };
@@ -52,6 +56,11 @@ describe('demo database seeder', () => {
     }
     const seller = state.users.find(({ email }) => email === 'demo.seller@smart-hammer.local');
     expect(state.auctions).toHaveLength(SAMPLE_AUCTIONS.length);
+    const auctionInsertInputs = state.bulkInsertInputs.filter(({ table }) => table === 'Auctions');
+    for (const insert of auctionInsertInputs) {
+      expect(typeof insert.rows[0].productFacts).toBe('string');
+      expect(JSON.parse(insert.rows[0].productFacts)).toEqual(expect.objectContaining({ accessories: expect.any(Array) }));
+    }
     for (const auction of state.auctions) {
       expect(auction.sellerId).toBe(seller.id);
       expect(auction.status).toBe('draft');
