@@ -172,6 +172,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Gunakan kategori backend yang diizinkan dan kirim field `category` dari form.
 - [ ] Tawarkan pilihan durasi 1, 3, dan 7 hari; verifikasi melalui browser bahwa nilai detik terkirim dan pilihan draft tetap tampil.
 - [x] Cocokkan respons bid/idempotency, tampilkan minimum bid dari state backend, dan sediakan `GET /auctions/:id/bids` terpaginasikan tanpa membocorkan idempotency key.
+- [x] Sertakan username publik bidder secara konsisten pada respons bid, riwayat, snapshot, dan event `bid:updated`; jangan sertakan data akun privat.
 - [x] Cocokkan Product Q&A dan riwayat AI dengan API; Q&A privat per pemilik, sedangkan commentary Auctioneer tetap publik.
 - [x] Konfigurasikan URL API/Socket.IO frontend, CORS Express, dan CORS Socket.IO memakai origin yang dikonfigurasi.
 
