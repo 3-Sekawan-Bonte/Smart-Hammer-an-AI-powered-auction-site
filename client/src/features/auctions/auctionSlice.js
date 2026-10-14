@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api, { getApiData, getApiError } from '../../lib/api.js';
+import { auctionFieldsConflict, isValidEvent, mergeBids, mergePublicInteractions, sameId, validateSnapshot } from './auctionRoom.js';
 
 const initialState = {
   catalog: {
@@ -25,6 +26,13 @@ const initialState = {
     submitStatus: 'idle',
     version: 0,
     serverNow: null,
+    serverTimeOffsetMs: 0,
+    bidsMeta: null,
+    aiMeta: null,
+    resyncRequired: false,
+    resyncReason: null,
+    bidsRequestId: null,
+    aiRequestId: null,
     currentId: null,
     requestId: null,
   },
@@ -70,10 +78,6 @@ function remainingTime(endsAt) {
   const seconds = totalSeconds % 60;
   if (hours > 0) return `${hours}j ${String(minutes).padStart(2, '0')}m`;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
-function dedupe(items, id) {
-  return items.some((item) => item.id === id);
 }
 
 export const loadAuctions = createAsyncThunk(
@@ -133,10 +137,9 @@ export const loadAuctionSnapshot = createAsyncThunk(
   'auction/loadAuctionSnapshot',
   async (auctionId, { rejectWithValue, signal }) => {
     try {
+      if (!/^[1-9]\d*$/.test(String(auctionId ?? ''))) return rejectWithValue('ID lelang tidak valid.');
       const response = await api.get(`/auctions/${auctionId}`, { signal });
-      const snapshot = getApiData(response);
-      if (!snapshot?.auction) throw new Error('Format snapshot lelang tidak valid.');
-      return snapshot;
+      return validateSnapshot(getApiData(response), auctionId);
     } catch (error) {
       return rejectWithValue(getApiError(error, 'Gagal memuat detail lelang.'));
     }
@@ -178,7 +181,10 @@ export const loadAIInteractions = createAsyncThunk(
   async (auctionId, { rejectWithValue }) => {
     try {
       const response = await api.get(`/auctions/${auctionId}/ai/interactions`);
-      return getApiData(response);
+      const result = getApiData(response);
+      const interactions = Array.isArray(result) ? result : result?.aiInteractions;
+      if (!Array.isArray(interactions)) throw new Error('Format riwayat AI tidak valid.');
+      return { interactions, meta: result?.meta || null, auctionId: String(auctionId) };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat AI.');
     }
@@ -190,111 +196,170 @@ export const loadBids = createAsyncThunk(
   async (auctionId, { rejectWithValue }) => {
     try {
       const response = await api.get(`/auctions/${auctionId}/bids`);
-      return getApiData(response);
+      const result = getApiData(response);
+      const bids = Array.isArray(result) ? result : result?.bids;
+      if (!Array.isArray(bids)) throw new Error('Format riwayat bid tidak valid.');
+      return { bids, meta: result?.meta || null, auctionId: String(auctionId) };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat bid.');
     }
   }
 );
 
+export const processAuctionEvent = (eventName, payload) => (dispatch, getState) => {
+  const actions = {
+    'auction:snapshot': auctionSnapshotReceived,
+    'auction:started': auctionStarted,
+    'bid:updated': bidReceived,
+    'auction:ended': auctionEnded,
+    'ai:pending': aiPending,
+    'ai:message': aiReceived,
+    'ai:error': aiFailed,
+  };
+  const actionCreator = actions[eventName];
+  if (!actionCreator) return null;
+  dispatch(actionCreator(payload));
+  const { active } = getState().auction;
+  if (active.resyncRequired && active.currentId && !active.requestId) return dispatch(loadAuctionSnapshot(active.currentId));
+  return null;
+};
+
+function applySnapshot(active, snapshot, toCard) {
+  let checked;
+  try { checked = validateSnapshot(snapshot, snapshot?.auction?.id); }
+  catch { active.resyncRequired = true; active.resyncReason = 'Snapshot lelang tidak valid.'; return; }
+  const { auction, bids, aiInteractions, serverNow, bidsMeta, aiMeta } = checked;
+  if (active.currentId && !sameId(active.currentId, auction.id)) return;
+  const incomingVersion = Number(auction.version);
+  if (active.auction && incomingVersion < active.version) {
+    active.loading = false;
+    active.error = null;
+    return;
+  }
+  if (active.auction && incomingVersion === active.version && auctionFieldsConflict(active.auction, auction)) {
+    active.loading = false;
+    active.resyncRequired = true;
+    active.resyncReason = 'Snapshot dengan versi sama berisi state berbeda.';
+    return;
+  }
+  const newer = !active.auction || incomingVersion > active.version;
+  if (newer) active.auction = toCard(auction);
+  active.currentId = String(auction.id);
+  active.version = newer ? incomingVersion : active.version;
+  active.bids = mergeBids(active.bids, bids, auction.id);
+  active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, aiInteractions, auction.id);
+  active.bidsMeta = bidsMeta ?? active.bidsMeta;
+  active.aiMeta = aiMeta ?? active.aiMeta;
+  active.participants = Array.isArray(checked.participants) ? checked.participants : active.participants;
+  active.serverNow = serverNow || active.serverNow;
+  active.serverTimeOffsetMs = serverNow && Number.isFinite(Date.parse(serverNow)) ? Date.parse(serverNow) - Date.now() : active.serverTimeOffsetMs;
+  active.loading = false;
+  active.error = null;
+  active.resyncRequired = false;
+  active.resyncReason = null;
+}
+
+function applyIncremental(active, payload, toCard) {
+  if (!active.auction) return;
+  const payloadAuctionId = payload?.auctionId ?? payload?.bid?.auctionId ?? payload?.interaction?.auctionId ?? payload?.auction?.id;
+  if (!sameId(payloadAuctionId, active.currentId)) return;
+  if (!isValidEvent(payload, active.currentId)) {
+    active.resyncRequired = true;
+    active.resyncReason = 'Event lelang tidak valid atau versi payload tidak konsisten.';
+    return;
+  }
+  const incoming = payload.auction;
+  const version = Number(incoming.version);
+  if (version < active.version) return;
+  if (version === active.version) {
+    if (auctionFieldsConflict(active.auction, incoming)) {
+      active.resyncRequired = true;
+      active.resyncReason = 'Event dengan versi sama berisi state berbeda.';
+      return;
+    }
+    mergeEventCollections(active, payload);
+    return;
+  }
+  if (version !== active.version + 1) {
+    active.resyncRequired = true;
+    active.resyncReason = `Versi lelang meloncat dari ${active.version} ke ${version}.`;
+    return;
+  }
+  const lifecycleRank = { draft: 0, live: 1, ended: 2 };
+  if ((lifecycleRank[incoming.status] ?? -1) < (lifecycleRank[active.auction.status] ?? -1)) {
+    active.resyncRequired = true;
+    active.resyncReason = 'Event lelang mencoba memundurkan status lifecycle.';
+    return;
+  }
+  active.auction = toCard(incoming);
+  active.version = version;
+  active.serverNow = payload.serverNow || active.serverNow;
+  active.serverTimeOffsetMs = payload.serverNow && Number.isFinite(Date.parse(payload.serverNow)) ? Date.parse(payload.serverNow) - Date.now() : active.serverTimeOffsetMs;
+  mergeEventCollections(active, payload);
+  active.resyncRequired = false;
+  active.resyncReason = null;
+}
+
+function mergeEventCollections(active, payload) {
+  const auctionId = active.currentId;
+  const bids = payload.bids || (payload.bid ? [payload.bid] : []);
+  if (Array.isArray(bids)) active.bids = mergeBids(active.bids, bids, auctionId);
+  const interactions = payload.aiInteractions || (payload.interaction ? [payload.interaction] : []);
+  if (Array.isArray(interactions)) active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, interactions, auctionId);
+}
+
+function applyAI(active, interaction) {
+  if (!interaction || !active.auction || !sameId(interaction.auctionId, active.currentId)) return;
+  active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, [interaction], active.currentId);
+}
+
+function applyMutationAuction(active, auction) {
+  if (!active.auction || !sameId(active.currentId, auction?.id)) return;
+  const version = Number(auction.version);
+  if (!Number.isSafeInteger(version) || version < active.version) return;
+  if (version === active.version && auctionFieldsConflict(active.auction, auction)) {
+    active.resyncRequired = true;
+    active.resyncReason = 'Respons mutation berbeda pada versi lelang yang sama.';
+    return;
+  }
+  if (active.auction.status === 'ended' && auction.status !== 'ended') return;
+  active.auction = toAuctionCard(auction);
+  active.version = version;
+}
+
 const auctionSlice = createSlice({
   name: 'auction',
   initialState,
   reducers: {
     auctionSnapshotReceived(state, action) {
-      const { auction, bids, aiInteractions, participants, serverNow, version } = action.payload;
-      const incomingVersion = version ?? auction?.version ?? 0;
-      if (state.active.auction && state.active.version > incomingVersion) {
-        return;
-      }
-      state.active.auction = auction ? {
-        ...auction,
-        price: auction.currentPrice ?? auction.startingPrice ?? 0,
-        bids: auction.bidCount ?? bids?.length ?? 0,
-        time: remainingTime(auction.endsAt),
-        visualPosition: auction.visualPosition || fixtureImagePositions[auction.id] || '50% 50%',
-      } : null;
-      state.active.bids = bids || [];
-      state.active.publicAIInteractions = aiInteractions || [];
-      state.active.participants = participants || [];
-      state.active.version = incomingVersion;
-      state.active.serverNow = serverNow;
-      state.active.loading = false;
-      state.active.error = null;
+      applySnapshot(state.active, action.payload, toAuctionCard);
     },
     auctionStarted(state, action) {
-      const { auction, version, serverNow } = action.payload;
-      if (state.active.auction && state.active.version > version) return;
-      state.active.auction = {
-        ...state.active.auction,
-        ...auction,
-        status: 'live',
-        price: auction.currentPrice ?? auction.startingPrice ?? 0,
-        time: remainingTime(auction.endsAt),
-      };
-      state.active.version = version;
-      state.active.serverNow = serverNow;
+      applyIncremental(state.active, action.payload, toAuctionCard);
     },
     bidReceived(state, action) {
-      const bid = action.payload;
-      if (dedupe(state.active.bids, bid.id)) {
-        state.active.submitStatus = 'success';
-        return;
-      }
-      if (state.active.auction) {
-        state.active.auction = {
-          ...state.active.auction,
-          currentPrice: bid.amount,
-          price: bid.amount,
-          version: state.active.version + 1,
-          endsAt: bid.endsAt || state.active.auction.endsAt,
-          highestBidderId: bid.userId,
-        };
-      }
-      state.active.bids = [bid, ...state.active.bids];
-      state.active.version += 1;
-      state.active.submitStatus = 'success';
+      applyIncremental(state.active, action.payload, toAuctionCard);
+      if (sameId(state.active.currentId, action.payload?.auctionId ?? action.payload?.auction?.id)) state.active.submitStatus = 'success';
     },
     auctionEnded(state, action) {
-      const { auction, winnerId, finalPrice, version, serverNow } = action.payload;
-      if (state.active.auction && state.active.version > version) return;
-      state.active.auction = {
-        ...state.active.auction,
-        ...auction,
-        status: 'ended',
-        winnerId,
-        finalPrice,
-        price: finalPrice ?? state.active.auction?.price ?? 0,
-      };
-      state.active.version = version;
-      state.active.serverNow = serverNow;
+      applyIncremental(state.active, action.payload, toAuctionCard);
     },
     aiPending(state, action) {
-      const interaction = action.payload;
-      if (!dedupe(state.active.publicAIInteractions, interaction.id)) {
-        state.active.publicAIInteractions = [...state.active.publicAIInteractions, interaction];
-      }
+      applyAI(state.active, action.payload?.interaction || action.payload);
     },
     aiReceived(state, action) {
-      const interaction = action.payload;
-      const idx = state.active.publicAIInteractions.findIndex((i) => i.id === interaction.id);
-      if (idx >= 0) {
-        state.active.publicAIInteractions[idx] = interaction;
-      } else {
-        state.active.publicAIInteractions = [...state.active.publicAIInteractions, interaction];
-      }
+      applyAI(state.active, action.payload?.interaction || action.payload);
     },
     aiFailed(state, action) {
-      const interaction = action.payload;
-      const idx = state.active.publicAIInteractions.findIndex((i) => i.id === interaction.id);
-      if (idx >= 0) {
-        state.active.publicAIInteractions[idx] = interaction;
-      } else {
-        state.active.publicAIInteractions = [...state.active.publicAIInteractions, interaction];
-      }
+      applyAI(state.active, action.payload?.interaction || action.payload);
     },
     presenceReceived(state, action) {
-      state.active.participants = action.payload;
+      if (Array.isArray(action.payload) && action.payload.every((item) => item && typeof item === 'object')) state.active.participants = action.payload;
+    },
+    roomReset(state) { state.active = { ...initialState.active }; },
+    resyncRequested(state, action) {
+      state.active.resyncRequired = true;
+      state.active.resyncReason = typeof action.payload === 'string' ? action.payload : action.payload?.reason || 'State lelang perlu disinkronkan.';
     },
     submitBidStart(state) {
       state.active.submitStatus = 'loading';
@@ -355,10 +420,7 @@ const auctionSlice = createSlice({
       })
       .addCase(updateAuction.fulfilled, (state, action) => {
         state.edit.status = 'success';
-        if (state.active.currentId === String(action.payload.id)) {
-          state.active.auction = action.payload;
-          state.active.version = action.payload.version ?? state.active.version;
-        }
+        applyMutationAuction(state.active, action.payload);
       })
       .addCase(updateAuction.rejected, (state, action) => {
         state.edit.status = 'error';
@@ -370,10 +432,7 @@ const auctionSlice = createSlice({
       })
       .addCase(startAuction.fulfilled, (state, action) => {
         state.start.status = 'success';
-        if (state.active.currentId === String(action.payload.id)) {
-          state.active.auction = action.payload;
-          state.active.version = action.payload.version ?? state.active.version;
-        }
+        applyMutationAuction(state.active, action.payload);
       })
       .addCase(startAuction.rejected, (state, action) => {
         state.start.status = 'error';
@@ -382,24 +441,29 @@ const auctionSlice = createSlice({
       .addCase(loadAuctionSnapshot.pending, (state, action) => {
         state.active.loading = true;
         state.active.error = null;
-        state.active.auction = null;
-        state.active.bids = [];
-        state.active.publicAIInteractions = [];
-        state.active.participants = [];
+        const switching = !sameId(state.active.currentId, action.meta.arg);
+        if (switching) {
+          state.active.auction = null;
+          state.active.bids = [];
+          state.active.publicAIInteractions = [];
+          state.active.participants = [];
+          state.active.version = 0;
+          state.active.serverNow = null;
+          state.active.serverTimeOffsetMs = 0;
+          state.active.bidsMeta = null;
+          state.active.aiMeta = null;
+          state.active.bidsRequestId = null;
+          state.active.aiRequestId = null;
+          state.active.submitStatus = 'idle';
+          state.active.resyncRequired = false;
+          state.active.resyncReason = null;
+        }
         state.active.currentId = String(action.meta.arg);
         state.active.requestId = action.meta.requestId;
       })
       .addCase(loadAuctionSnapshot.fulfilled, (state, action) => {
         if (state.active.requestId !== action.meta.requestId) return;
-        const { auction, bids, aiInteractions, serverNow, version } = action.payload;
-        state.active.auction = auction ? toAuctionCard(auction) : null;
-        state.active.bids = bids || [];
-        state.active.publicAIInteractions = aiInteractions || [];
-        state.active.participants = [];
-        state.active.version = version ?? auction?.version ?? 0;
-        state.active.serverNow = serverNow;
-        state.active.loading = false;
-        state.active.error = null;
+        applySnapshot(state.active, action.payload, toAuctionCard);
         state.active.requestId = null;
       })
       .addCase(loadAuctionSnapshot.rejected, (state, action) => {
@@ -413,8 +477,13 @@ const auctionSlice = createSlice({
         state.active.error = null;
       })
       .addCase(submitBid.fulfilled, (state, action) => {
+        if (!sameId(state.active.currentId, action.meta.arg.auctionId)) return;
         state.active.submitStatus = 'success';
-        // The socket event will handle the actual state update
+        if (action.payload?.auction) applyIncremental(state.active, action.payload, toAuctionCard);
+        else if (state.active.auction) {
+          state.active.resyncRequired = true;
+          state.active.resyncReason = 'Respons bid tidak menyertakan state lelang authoritative.';
+        }
       })
       .addCase(submitBid.rejected, (state, action) => {
         state.active.submitStatus = 'error';
@@ -429,11 +498,29 @@ const auctionSlice = createSlice({
       .addCase(askAI.rejected, (state, action) => {
         // Error handled in component
       })
+      .addCase(loadAIInteractions.pending, (state, action) => {
+        if (sameId(state.active.currentId, action.meta.arg)) state.active.aiRequestId = action.meta.requestId;
+      })
       .addCase(loadAIInteractions.fulfilled, (state, action) => {
-        state.active.publicAIInteractions = action.payload;
+        if (!sameId(state.active.currentId, action.payload.auctionId) || state.active.aiRequestId !== action.meta.requestId) return;
+        state.active.publicAIInteractions = mergePublicInteractions(state.active.publicAIInteractions, action.payload.interactions, state.active.currentId);
+        state.active.aiMeta = action.payload.meta;
+        state.active.aiRequestId = null;
+      })
+      .addCase(loadAIInteractions.rejected, (state, action) => {
+        if (state.active.aiRequestId === action.meta.requestId) state.active.aiRequestId = null;
+      })
+      .addCase(loadBids.pending, (state, action) => {
+        if (sameId(state.active.currentId, action.meta.arg)) state.active.bidsRequestId = action.meta.requestId;
       })
       .addCase(loadBids.fulfilled, (state, action) => {
-        state.active.bids = Array.isArray(action.payload) ? action.payload : [];
+        if (!sameId(state.active.currentId, action.payload.auctionId) || state.active.bidsRequestId !== action.meta.requestId) return;
+        state.active.bids = mergeBids(state.active.bids, action.payload.bids, state.active.currentId);
+        state.active.bidsMeta = action.payload.meta;
+        state.active.bidsRequestId = null;
+      })
+      .addCase(loadBids.rejected, (state, action) => {
+        if (state.active.bidsRequestId === action.meta.requestId) state.active.bidsRequestId = null;
       })
       .addCase('auth/logout', (state) => {
         state.catalog.auctions = [];
@@ -444,7 +531,9 @@ const auctionSlice = createSlice({
         state.create = { ...initialState.create };
         state.edit = { ...initialState.edit };
         state.start = { ...initialState.start };
-      });
+      })
+      .addCase('auth/login/fulfilled', (state) => { state.active = { ...initialState.active }; })
+      .addCase('auth/restoreSession/fulfilled', (state) => { state.active = { ...initialState.active }; });
   },
 });
 
@@ -460,6 +549,8 @@ export const {
   submitBidStart,
   submitBidFailed,
   clearActiveAuction,
+  roomReset,
+  resyncRequested,
   clearCatalogError,
   resetCreateStatus,
 } = auctionSlice.actions;
@@ -485,5 +576,20 @@ export const selectActiveId = (state) => state.auction.active.currentId;
 export const selectSubmitStatus = (state) => state.auction.active.submitStatus;
 export const selectActiveVersion = (state) => state.auction.active.version;
 export const selectServerNow = (state) => state.auction.active.serverNow;
+export const selectServerTimeOffsetMs = (state) => state.auction.active.serverTimeOffsetMs;
+export const selectActiveResyncRequired = (state) => state.auction.active.resyncRequired;
+export const selectActiveResyncReason = (state) => state.auction.active.resyncReason;
+export const selectActiveBidsMeta = (state) => state.auction.active.bidsMeta;
+export const selectActiveAIMeta = (state) => state.auction.active.aiMeta;
+export const selectCurrentPrice = (state) => state.auction.active.auction?.currentPrice ?? null;
+export const selectNextMinimumBid = (state) => state.auction.active.auction?.nextMinimumBid ?? null;
+export const selectAuctionStatus = (state) => state.auction.active.auction?.status ?? null;
+export const selectAuctionBidCount = (state) => state.auction.active.auction?.bidCount ?? 0;
+export const selectHighestBidder = (state) => state.auction.active.auction?.highestBidder ?? null;
+export const selectAuctionDeadline = (state) => state.auction.active.auction?.endsAt ?? null;
+export const selectAuctionWinner = (state) => state.auction.active.auction?.winner ?? null;
+export const selectAuctionLoading = selectActiveLoading;
+export const selectAuctionError = selectActiveError;
+export const selectAuctionRoom = (state) => state.auction.active;
 
 export default auctionSlice.reducer;
