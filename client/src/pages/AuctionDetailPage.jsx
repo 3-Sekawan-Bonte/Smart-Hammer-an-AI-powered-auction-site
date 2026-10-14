@@ -21,8 +21,15 @@ export default function AuctionDetailPage() {
   const connectionStatus = useSelector(selectConnectionStatus);
   const roomStatus = useSelector(selectRoomStatus);
   const roomError = useSelector(selectRoomError);
+  const resyncRequired = useSelector((state) => state.auction.active.resyncRequired);
+  const snapshotRequestId = useSelector((state) => state.auction.active.requestId);
   useEffect(() => { if (!id) return undefined; const request = dispatch(loadAuctionSnapshot(id)); return () => request.abort(); }, [id, dispatch]);
   const refreshAfterDeadline = useCallback(() => dispatch(loadAuctionSnapshot(id)), [dispatch, id]);
+  useEffect(() => {
+    if (!resyncRequired || snapshotRequestId || !id) return undefined;
+    const timer = window.setTimeout(() => dispatch(loadAuctionSnapshot(id)), 2000);
+    return () => window.clearTimeout(timer);
+  }, [dispatch, id, resyncRequired, snapshotRequestId, error]);
   const resultState = getAuctionResultState(auction);
   useEffect(() => {
     if (resultState.kind !== 'loading') { resultRefreshRef.current = null; return; }

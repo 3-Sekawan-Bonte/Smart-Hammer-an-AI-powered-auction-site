@@ -31,12 +31,12 @@ async function setup(t) {
   const directory = await mkdtemp(join(tmpdir(), 'smart-hammer-fe06-'));
   const databasePath = join(directory, 'db.json');
   await copyFile(fixture, databasePath);
-  const server = createMockServer({ databasePath, jwtSecret: secret });
+  const server = createMockServer({ databasePath, jwtSecret: secret, environment: 'test' });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   const url = `http://127.0.0.1:${server.address().port}`;
-  const request = (path, { token, method = 'GET', body } = {}) => fetch(`${url}${path}`, {
+  const request = (path, { token, method = 'GET', body, headers = {} } = {}) => fetch(`${url}${path}`, {
     method,
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   const login = async (email = 'demo@smart-hammer.id', password = 'smart123') => {
@@ -59,6 +59,40 @@ async function setup(t) {
   });
   return { createBuyer, databasePath, login, readDb, request, server, url, writeDb };
 }
+
+test('a dropped accepted bid response replays the same UUID without duplicate bid or broadcast', async (t) => {
+  const app = await setup(t);
+  const token = await app.login();
+  const buyer = socketClient(app.url, { auth: { token }, transports: ['websocket'], reconnection: false });
+  t.after(() => buyer.disconnect());
+  await once(buyer, 'connect');
+  const snapshot = once(buyer, 'auction:snapshot');
+  await new Promise((resolve) => buyer.timeout(1000).emit('auction:join', { auctionId: 12 }, (error, result) => error ? resolve(null) : resolve(result)));
+  await snapshot;
+  let broadcasts = 0;
+  buyer.on('bid:updated', () => { broadcasts += 1; });
+  const clientRequestId = randomUUID();
+  const body = { amount: 2_000_000, clientRequestId };
+  await assert.rejects(app.request('/auctions/12/bids', { token, method: 'POST', body, headers: { 'x-mock-fault': 'drop-bid-response' } }));
+  const replay = await app.request('/auctions/12/bids', { token, method: 'POST', body });
+  assert.equal(replay.status, 200);
+  assert.equal((await replay.json()).data.replayed, true);
+  await waitFor(() => broadcasts === 1, 'single broadcast for accepted bid');
+  await pause(50);
+  const db = await app.readDb();
+  assert.equal(db.bids.filter((bid) => bid.clientRequestId === clientRequestId).length, 1);
+  assert.equal(broadcasts, 1);
+});
+
+test('loopback recovery fault injection returns deterministic HTTP status scenarios', async (t) => {
+  const app = await setup(t);
+  const token = await app.login();
+  for (const status of [400, 401, 403, 404, 409, 429, 500, 503]) {
+    const response = await app.request('/auctions', { token, headers: { 'x-mock-fault': `http-${status}` } });
+    assert.equal(response.status, status);
+    assert.equal((await response.json()).error.code, status === 401 ? 'UNAUTHORIZED' : `MOCK_HTTP_${status}`);
+  }
+});
 
 test('two buyers submit real HTTP bids, receive Socket.IO updates, and Redux reconciles without duplicates', async (t) => {
   const app = await setup(t);

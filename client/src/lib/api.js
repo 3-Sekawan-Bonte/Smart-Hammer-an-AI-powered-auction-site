@@ -60,12 +60,30 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+export function classifyApiError(error) {
+  const status = error?.response?.status ?? null;
+  const code = error?.response?.data?.error?.code || error?.code || null;
+  return { status, code, retryable: !error?.config?.signal?.aborted && !['ERR_CANCELED', 'CanceledError'].includes(error?.code) && (!error?.response || status >= 500), unauthorized: status === 401, retryAfter: Number(error?.response?.headers?.['retry-after'] || error?.response?.data?.error?.details?.retryAfterSeconds || 0) };
+}
+
+function emitApiStatus(status) {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('smart-hammer:api-status', { detail: status }));
+}
+
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response) => { emitApiStatus('reachable'); return response; },
+  async (error) => {
+    const config = error.config || {};
+    const classification = classifyApiError(error);
+    if (String(config.method || 'get').toLowerCase() === 'get' && classification.retryable && (config.__getRetryCount || 0) < 2) {
+      config.__getRetryCount = (config.__getRetryCount || 0) + 1;
+      await new Promise((resolve) => setTimeout(resolve, 150 * (2 ** (config.__getRetryCount - 1))));
+      return api.request(config);
+    }
+    if (!error.response) emitApiStatus('unreachable');
     const requestToken = error.config?.__smartHammerAuthToken;
     const currentToken = localStorage.getItem(TOKEN_KEY);
-    if (error.response?.status === 401 && !isPublicAuthRequest(error.config) && requestToken && requestToken === currentToken) {
+    if (classification.unauthorized && !isPublicAuthRequest(error.config) && requestToken && requestToken === currentToken) {
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_ID_KEY);
       window.dispatchEvent(new Event('smart-hammer:unauthorized'));

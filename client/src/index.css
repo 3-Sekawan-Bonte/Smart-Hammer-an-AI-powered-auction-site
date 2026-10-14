@@ -522,3 +522,5 @@ textarea.input { min-height: 128px; resize: vertical; }
 @media (max-width: 1100px) { .auction-room-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } .auction-room-panels > :last-child { grid-column: 1 / -1; } .ai-history { max-height: 390px; } }
 @media (max-width: 700px) { .auction-room-panels { grid-template-columns: 1fr; } .auction-room-panels > :last-child { grid-column: auto; } .ai-panel { padding: 18px; } .ai-history { max-height: 420px; } }
 @media (prefers-reduced-motion: reduce) { .ai-spinner { animation-duration: 2s; } }
+
+.connection-banner { position: sticky; top: 0; z-index: 20; padding: 10px 20px; text-align: center; color: #7a4a00; background: #fff2cf; border-bottom: 1px solid #ecd28c; font-size: 13px; font-weight: 700; }

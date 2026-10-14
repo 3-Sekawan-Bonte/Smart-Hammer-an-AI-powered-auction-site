@@ -90,6 +90,17 @@ test('logout invalidates a pending session restoration so a late profile cannot 
   delete globalThis.localStorage;
 });
 
+test('a temporary session restore outage preserves the authenticated account', () => {
+  let state = authReducer(undefined, { type: '@@test/init' });
+  state = { ...state, status: 'restoring', accessToken: 'valid-token', user: { id: 4, username: 'buyer', email: 'buyer@example.com' }, restoreRequestId: 'restore-1' };
+  state = authReducer(state, restoreSession.rejected(new Error('503'), 'restore-1', undefined, {
+    message: 'Server sementara tidak tersedia.', code: 'MOCK_HTTP_503', fields: {}, invalidToken: false,
+  }));
+  assert.equal(state.status, 'succeeded');
+  assert.equal(state.accessToken, 'valid-token');
+  assert.equal(state.user.username, 'buyer');
+});
+
 test('a new login invalidates an older pending profile restoration', () => {
   let state = authReducer(undefined, { type: '@@test/init' });
   state = authReducer(state, restoreSession.pending('restore-old', undefined));

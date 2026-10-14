@@ -31,11 +31,12 @@ export const restoreSession = createAsyncThunk(
       }
       return { token, user };
     } catch (error) {
-      if (localStorage.getItem(TOKEN_KEY) === token) {
+      const invalidToken = error?.response?.status === 401;
+      if (invalidToken && localStorage.getItem(TOKEN_KEY) === token) {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_ID_KEY);
       }
-      return rejectWithValue(getApiErrorDetails(error, 'Sesi berakhir. Silakan login kembali.'));
+      return rejectWithValue({ ...getApiErrorDetails(error, invalidToken ? 'Sesi berakhir. Silakan login kembali.' : 'Server sementara tidak tersedia.'), invalidToken });
     }
   },
   {
@@ -123,9 +124,12 @@ const authSlice = createSlice({
       })
       .addCase(restoreSession.rejected, (state, action) => {
         if (state.restoreRequestId !== action.meta.requestId) return;
-        state.status = 'anonymous';
-        state.accessToken = null;
-        state.user = null;
+        const invalidToken = action.payload?.invalidToken;
+        state.status = invalidToken || !state.accessToken ? 'anonymous' : 'succeeded';
+        if (invalidToken || !state.accessToken) {
+          state.accessToken = null;
+          state.user = null;
+        }
         state.error = action.payload ?? null;
         state.restoreRequestId = null;
       })

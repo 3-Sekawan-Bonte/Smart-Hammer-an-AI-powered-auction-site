@@ -500,6 +500,17 @@ export function createMockServer({
 
       const currentUser = getCurrentUser(database, request, jwtSecret);
       if (!currentUser) return errorResponse(response, 401, 'UNAUTHORIZED', 'Silakan login untuk melanjutkan.');
+      const faultMode = String(request.headers['x-mock-fault'] || '').toLowerCase();
+      const faultInjectionEnabled = environment === 'test' || process.env.BIDWAR_MOCK_FAULTS === '1';
+      const allowFault = faultInjectionEnabled && isLoopbackRequest(request);
+      if (faultMode && allowFault && faultMode.startsWith('http-')) {
+        const status = Number(faultMode.slice(5));
+        if ([400, 401, 403, 404, 409, 429, 500, 503].includes(status)) {
+          return errorResponse(response, status, status === 401 ? 'UNAUTHORIZED' : `MOCK_HTTP_${status}`, 'Simulasi fault HTTP lokal.');
+        }
+      }
+      if (faultMode === 'delay' && allowFault) await new Promise((resolve) => setTimeout(resolve, 1500));
+      const dropBidResponse = faultMode === 'drop-bid-response' && allowFault && request.method === 'POST' && /^\/auctions\/[^/]+\/bids$/.test(pathname);
 
       const mockScenarioMatch = /^\/__mock\/auctions\/([^/]+)\/([a-z-]+)$/.exec(pathname);
       if (mockScenarioMatch && request.method === 'POST') {
@@ -764,6 +775,10 @@ export function createMockServer({
           if (outcome.event?.auction?.bidCount > 0 && outcome.event.auction.bidCount % 5 === 0) void scheduleCommentary(auctionId, 'milestone');
         }
         if (outcome.code) return errorResponse(response, outcome.status, outcome.code, outcome.message, {}, outcome.details || {});
+        if (dropBidResponse && !outcome.data?.replayed) {
+          response.destroy();
+          return;
+        }
         return send(response, outcome.status, { message: outcome.message, data: outcome.data });
       }
 

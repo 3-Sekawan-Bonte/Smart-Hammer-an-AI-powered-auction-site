@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GavelIcon, LogoutIcon } from './Icons';
+import ConnectionBanner from './ConnectionBanner';
 
 function Brand() {
   return <NavLink className="brand" to="/"><span className="brand-mark"><GavelIcon /></span><span>Smart<span className="brand-accent">Hammer</span></span></NavLink>;
@@ -37,7 +38,7 @@ export default function Layout() {
           </div>
         </div>
       </header>
-      <main id="main-content"><Outlet /></main>
+      <ConnectionBanner /><main id="main-content"><Outlet /></main>
       <footer className="footer"><div className="container footer-row"><div><Brand /><p className="small footer-copy">Lelang demo dengan mock backend lokal.</p></div><div className="footer-meta"><span>React + Redux Toolkit</span><span>Development only · no real-money transactions</span></div></div></footer>
     </>
   );
