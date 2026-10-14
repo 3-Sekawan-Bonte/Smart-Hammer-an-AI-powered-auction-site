@@ -1,6 +1,25 @@
 const { Sequelize } = require('sequelize');
+const { resolveTestDatabaseConfig } = require('./testDatabaseConfig');
 
 function createSequelize(env = process.env) {
+  if (env.NODE_ENV === 'test') {
+    const config = resolveTestDatabaseConfig(env);
+    if (config.url) {
+      return new Sequelize(config.url, {
+        dialect: config.dialect,
+        logging: config.logging,
+        dialectOptions: config.dialectOptions,
+      });
+    }
+    return new Sequelize(config.database, config.username, config.password, {
+      host: config.host,
+      port: config.port,
+      dialect: config.dialect,
+      logging: config.logging,
+      dialectOptions: config.dialectOptions,
+    });
+  }
+
   if (env.DATABASE_URL) {
     return new Sequelize(env.DATABASE_URL, {
       dialect: 'postgres',

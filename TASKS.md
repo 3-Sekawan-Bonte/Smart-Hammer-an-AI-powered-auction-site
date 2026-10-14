@@ -39,7 +39,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Middleware JWT untuk route terlindungi; identitas diambil dari subject JWT terverifikasi.
 - [x] Validasi input autentikasi, tolak field yang tidak dikenal, dan gunakan format error standar.
 - [x] Pastikan respons tidak mengandung password/hash.
-- [ ] Jalankan dan verifikasi automated tests register, login, input invalid, password salah, token hilang/invalid, `GET /users/me`, password hash tidak terekspos, dan email duplikat.
+- [x] Jalankan dan verifikasi automated tests register, login, input invalid, password salah, token hilang/invalid, `GET /users/me`, password hash tidak terekspos, dan email duplikat.
 
 **Checkpoint:** register/login/restore-session berfungsi dan error mengikuti kontrak.
 
@@ -55,7 +55,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Implementasikan `DELETE /auctions/:id` untuk menghapus draft milik sendiri.
 - [x] Implementasikan query params `status`, `category`, `seller=me`, dan `search` pada `GET /auctions`.
 - [x] Gunakan serializer konsisten untuk objek Auction di REST dan Socket.IO.
-- [ ] Tambahkan tests permission dan lifecycle.
+- [x] Tambahkan tests permission dan lifecycle.
 
 **Checkpoint:** seller dapat membuat draft, melihatnya, mengeditnya, dan memulai lelang.
 
@@ -67,7 +67,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Implementasikan idempotency melalui `clientRequestId`.
 - [x] Update Bid, `currentPrice`, `highestBidderId`, `endsAt`, dan `version` dalam transaksi yang konsisten.
 - [ ] Broadcast tidak boleh terjadi sebelum commit.
-- [ ] Buat integration tests untuk bid minimum, request replay, payload conflict, dan bid simultan.
+- [x] Buat integration tests untuk bid minimum, request replay, payload conflict, dan bid simultan.
 
 **Checkpoint:** concurrent/retry bids tidak membuat duplikasi atau harga/state inkonsisten.
 
@@ -80,7 +80,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Tangani lelang berakhir tanpa bid.
 - [x] Pastikan bid tepat pada/setelah deadline ditolak.
 - [ ] Implementasikan countdown frontend dengan `endsAt` terbaru dan koreksi `serverNow`.
-- [ ] Uji penutupan berulang, sliding deadline, dan restart recovery.
+- [x] Uji penutupan berulang, sliding deadline, dan restart recovery.
 
 **Checkpoint:** waktu dan hasil lelang diputuskan backend, termasuk jika scheduler terlambat atau server restart.
 
@@ -147,7 +147,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 10 — Verifikasi akhir dan deployment
 
-- [ ] Jalankan test suite dan catat hasilnya.
+- [x] Jalankan test suite dan catat hasilnya.
 - [ ] Uji alur dengan dua sesi/browser terpisah.
 - [ ] Uji concurrency, idempotency, deadline, reconnect, dan AI failure.
 - [ ] Verifikasi CORS, `CLIENT_ORIGIN`, URL API, dan koneksi Socket.IO pada hosting.
