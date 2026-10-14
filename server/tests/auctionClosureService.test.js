@@ -1,7 +1,7 @@
 const { createAuctionClosureService } = require('../src/services/auctionClosureService');
 const { auctionToJSON } = require('../src/utils/auctionSerializer');
 
-function setup({ auction: overrides = {}, lastBid = null, clock = () => new Date('2026-10-14T12:00:00.000Z') } = {}) {
+function setup({ auction: overrides = {}, lastBid = null, clock = () => new Date('2026-10-14T12:00:00.000Z'), eventPublisher, failCommit = false } = {}) {
   const auction = {
     id: 12,
     status: 'live',
@@ -32,8 +32,8 @@ function setup({ auction: overrides = {}, lastBid = null, clock = () => new Date
       return lastBid;
     }),
   };
-  const sequelize = { async transaction(callback) { return callback(transaction); } };
-  return { service: createAuctionClosureService({ Auction, Bid, sequelize, clock }), auction, Auction, Bid, sequelize };
+  const sequelize = { async transaction(callback) { const result = await callback(transaction); if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
+  return { service: createAuctionClosureService({ Auction, Bid, sequelize, clock, eventPublisher }), auction, Auction, Bid, sequelize };
 }
 
 describe('auction closure service', () => {
@@ -55,6 +55,23 @@ describe('auction closure service', () => {
     const result = await service.close(auction.id);
     expect(result).toMatchObject({ closed: true, finalPrice: null });
     expect(auction).toMatchObject({ status: 'ended', winnerId: null, currentPrice: 1_000, version: 4 });
+  });
+
+  test('publishes auction:ended after commit, but not for a repeated close', async () => {
+    const publisher = { committed: false, publish: jest.fn(function publish() { expect(this.committed).toBe(true); }) };
+    const { service, auction } = setup({ lastBid: { amount: 1_500, userId: 4 }, eventPublisher: publisher });
+    await service.close(auction.id);
+    expect(publisher.publish).toHaveBeenCalledWith('auction:ended', auction, { winner: null, finalPrice: 1_500 });
+    publisher.publish.mockClear();
+    await service.close(auction.id);
+    expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  test('does not publish when the closure transaction fails to commit', async () => {
+    const publisher = { publish: jest.fn() };
+    const state = setup({ lastBid: { amount: 1_500, userId: 4 }, eventPublisher: publisher, failCommit: true });
+    await expect(state.service.close(12)).rejects.toThrow('commit failed');
+    expect(publisher.publish).not.toHaveBeenCalled();
   });
 
   test.each([

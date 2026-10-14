@@ -13,7 +13,7 @@ const input = {
   durationSeconds: 60,
 };
 
-function setup(overrides = {}) {
+function setup(overrides = {}, eventPublisher, failCommit = false) {
   const auction = {
     id: 12,
     sellerId: 5,
@@ -42,8 +42,8 @@ function setup(overrides = {}) {
   };
   const User = { name: 'User' };
   const transaction = { LOCK: { UPDATE: 'UPDATE' } };
-  const sequelize = { async transaction(callback) { return callback(transaction); } };
-  return { service: createAuctionService({ Auction, User, sequelize }), auction, transaction };
+  const sequelize = { async transaction(callback) { const result = await callback(transaction); if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
+  return { service: createAuctionService({ Auction, User, sequelize, eventPublisher }), auction, transaction };
 }
 
 describe('auction service lifecycle and permissions', () => {
@@ -101,6 +101,22 @@ describe('auction service lifecycle and permissions', () => {
     expect(auction.status).toBe('live');
     expect(auction.version).toBe(1);
     await expect(service.start(12, 5, now)).rejects.toMatchObject({ status: 409, code: 'AUCTION_NOT_DRAFT' });
+  });
+
+  test('publishes auction:started only after the start transaction resolves', async () => {
+    const publisher = { committed: false, publish: jest.fn(function publish() { expect(this.committed).toBe(true); }) };
+    const { service, auction } = setup({}, publisher);
+    await service.start(12, 5, new Date('2026-01-01T00:00:00.000Z'));
+    expect(publisher.publish).toHaveBeenCalledWith('auction:started', auction);
+  });
+
+  test('does not publish a failed or rolled-back start', async () => {
+    const publisher = { publish: jest.fn() };
+    const invalid = setup({ status: 'live' }, publisher);
+    await expect(invalid.service.start(12, 5)).rejects.toMatchObject({ code: 'AUCTION_NOT_DRAFT' });
+    const rolledBack = setup({}, publisher, true);
+    await expect(rolledBack.service.start(12, 5)).rejects.toThrow('commit failed');
+    expect(publisher.publish).not.toHaveBeenCalled();
   });
 
   test('only deletes drafts owned by the authenticated user', async () => {
