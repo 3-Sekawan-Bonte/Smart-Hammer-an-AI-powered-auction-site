@@ -1,0 +1,309 @@
+{
+  "$schema": "../node_modules/json-server/schema.json",
+  "users": [
+    {
+      "id": 1,
+      "username": "demo.bidder",
+      "email": "demo@smart-hammer.id",
+      "role": "buyer",
+      "createdAt": "2026-10-13T05:00:00.000Z",
+      "passwordHash": "scrypt$GR6bZBG0ZyoGxGAy3fWZIg$6PcWIQGEtw8qC25YuTSIo2q0uH5jHx9Di2Mja4-_XKmIoV88XyVvENb24adapN5RKe1KIbn5kp1nBBf2DSP6pw"
+    },
+    {
+      "id": 2,
+      "username": "rania.shop",
+      "email": "seller@smart-hammer.id",
+      "role": "seller",
+      "createdAt": "2026-10-13T05:00:00.000Z",
+      "passwordHash": "scrypt$a9aFuAwdtnFU93Kkucj98g$GkhexQ2MWYP4kzvlEOxQvARoeM-KHj1EZvZ6a3K9kLXO2z-4cneCPu8RLyoIUNsJlf0XbJgckXghJbdoGiuSQw"
+    },
+    {
+      "id": 3,
+      "username": "testuser",
+      "email": "test@test.com",
+      "role": "buyer",
+      "createdAt": "2026-10-13T17:56:15.717Z",
+      "passwordHash": "scrypt$tIIF89UoQwBCLzHasrwD-g$EtxW_M9it3IFZkctxFV-dS4RcSaE01uTPC97Dhn16Jyx8FT8rZMpS6mCDe-SdO0JtLEzkmHIfVFRMzjPznWgWQ"
+    },
+    {
+      "id": "4",
+      "username": "testuser2",
+      "email": "test2@test.com",
+      "role": "buyer",
+      "createdAt": "2026-10-14T02:47:13.779Z",
+      "passwordHash": "scrypt$XPf1iLEURUZcj9PRJNEO1Q$fFho6VFqpAha5TgQ3JZ1Lyi-gRXwEosIE5UeKAFC7JVukkrymbXBKXtf33SPPsOvPb3CrBkAHfHWSP3viCIUOA"
+    }
+  ],
+  "auctions": [
+    {
+      "id": 12,
+      "sellerId": "2",
+      "seller": "rania.shop",
+      "title": "Headphone Studio Aurora",
+      "category": "electronics",
+      "condition": "used_good",
+      "description": "Pemakaian 6 bulan, berfungsi normal menurut seller. Terdapat gores halus pada case.",
+      "productFacts": {
+        "specifications": "Driver 40mm, impedansi 32 ohm, respons frekuensi 20Hz-20kHz, kabel detachable 1.2m",
+        "defects": "Gores halus pada case kiri, padding headband sedikit aus",
+        "accessories": [
+          "Case carrying",
+          "Kabel 1.2m",
+          "Adapter 6.3mm"
+        ],
+        "warranty": "Garansi resmi tersisa 6 bulan"
+      },
+      "imageUrl": "https://example.com/headphone-aurora.jpg",
+      "startingPrice": 2000000,
+      "currentPrice": 2000000,
+      "minIncrement": 50000,
+      "durationSeconds": 10800,
+      "bidCount": 0,
+      "status": "live",
+      "endsAt": "2026-10-15T13:00:00.000Z",
+      "visualPosition": "0% 0%",
+      "version": 3,
+      "startsAt": "2026-10-13T05:00:00.000Z",
+      "highestBidderId": null,
+      "createdAt": "2026-10-13T05:00:00.000Z",
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "id": 13,
+      "sellerId": "2",
+      "seller": "arsip.waktu",
+      "title": "Chronograph Meridian 1968",
+      "category": "electronics",
+      "condition": "used_fair",
+      "description": "Jam koleksi dengan kondisi terawat.",
+      "productFacts": {
+        "specifications": "Mekanik otomatis, case 38mm stainless steel, sapphire crystal, water resistant 50m",
+        "defects": "Beberapa gores pada case, bracelet memiliki stretch ringan",
+        "accessories": [
+          "Box original",
+          "Kartu garansi",
+          "Manual book"
+        ],
+        "warranty": "Tidak ada garansi tersisa"
+      },
+      "imageUrl": "https://example.com/chronograph-meridian.jpg",
+      "startingPrice": 4000000,
+      "currentPrice": 4000000,
+      "minIncrement": 100000,
+      "durationSeconds": 14400,
+      "bidCount": 0,
+      "status": "live",
+      "endsAt": "2026-10-15T14:00:00.000Z",
+      "visualPosition": "50% 0%",
+      "version": 2,
+      "startsAt": "2026-10-13T06:00:00.000Z",
+      "highestBidderId": null,
+      "createdAt": "2026-10-13T06:00:00.000Z",
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "id": 14,
+      "sellerId": "2",
+      "seller": "ruanganalog",
+      "title": "Kamera Analog Vista M3",
+      "category": "electronics",
+      "condition": "used_good",
+      "description": "Kamera analog siap pakai dengan light meter normal.",
+      "productFacts": {
+        "specifications": "35mm SLR, shutter speed 1/1000-1s, bulb mode, mount Canon FD",
+        "defects": "Light meter akurat, viewfinder bersih, body ada gores minor",
+        "accessories": [
+          "Lensa 50mm f/1.8",
+          "Tas kamera",
+          "Strap original"
+        ],
+        "warranty": "Tidak ada garansi"
+      },
+      "imageUrl": "https://example.com/vista-m3.jpg",
+      "startingPrice": 2800000,
+      "currentPrice": 2800000,
+      "minIncrement": 50000,
+      "durationSeconds": 18000,
+      "bidCount": 0,
+      "status": "live",
+      "endsAt": "2026-10-15T15:00:00.000Z",
+      "visualPosition": "100% 0%",
+      "version": 2,
+      "startsAt": "2026-10-13T07:00:00.000Z",
+      "highestBidderId": null,
+      "createdAt": "2026-10-13T07:00:00.000Z",
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "id": 15,
+      "sellerId": "2",
+      "seller": "keyhouse",
+      "title": "Mechanical Keyboard K-75",
+      "category": "electronics",
+      "condition": "new",
+      "description": "Keyboard mekanikal ringkas dengan switch linear dan kelengkapan penuh.",
+      "productFacts": {
+        "specifications": "75% layout, switch Gateron Red linear, hot-swappable, RGB per-key, Bluetooth 5.1/2.4GHz/USB-C",
+        "defects": "Baru, tidak ada cacat",
+        "accessories": [
+          "Keycap puller",
+          "Switch puller",
+          "Kabel USB-C",
+          "Dongle 2.4GHz",
+          "Keycaps tambahan"
+        ],
+        "warranty": "Garansi resmi 1 tahun"
+      },
+      "imageUrl": "https://example.com/k75-keyboard.jpg",
+      "startingPrice": 1100000,
+      "currentPrice": 1100000,
+      "minIncrement": 50000,
+      "durationSeconds": 21600,
+      "bidCount": 0,
+      "status": "live",
+      "endsAt": "2026-10-15T16:00:00.000Z",
+      "visualPosition": "50% 100%",
+      "version": 2,
+      "startsAt": "2026-10-13T08:00:00.000Z",
+      "highestBidderId": null,
+      "createdAt": "2026-10-13T08:00:00.000Z",
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "id": 16,
+      "sellerId": "2",
+      "seller": "stereo.room",
+      "title": "Vinyl Player Nocturne",
+      "category": "electronics",
+      "condition": "used_fair",
+      "description": "Turntable vintage terawat dengan platter stabil dan cartridge aktif.",
+      "productFacts": {
+        "specifications": "Belt drive, 33/45 RPM, tonearm S-shape, cartridge Audio-Technica VM95E, preamp built-in",
+        "defects": "Dust cover ada retak kecil, platter sedikit bergoyang tapi stabil saat putar",
+        "accessories": [
+          "Dust cover",
+          "Cartridge VM95E",
+          "Counterweight",
+          "RCA cable"
+        ],
+        "warranty": "Tidak ada garansi"
+      },
+      "imageUrl": "https://example.com/nocturne-turntable.jpg",
+      "startingPrice": 2400000,
+      "currentPrice": 2400000,
+      "minIncrement": 50000,
+      "durationSeconds": 25200,
+      "bidCount": 0,
+      "status": "live",
+      "endsAt": "2026-10-15T17:00:00.000Z",
+      "visualPosition": "100% 100%",
+      "version": 2,
+      "startsAt": "2026-10-13T09:00:00.000Z",
+      "highestBidderId": null,
+      "createdAt": "2026-10-13T09:00:00.000Z",
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "id": 17,
+      "sellerId": "2",
+      "seller": "solearchive",
+      "title": "Headphone Studio Lite",
+      "category": "electronics",
+      "condition": "new",
+      "description": "Headphone over-ear untuk mendengarkan musik di rumah dan perjalanan.",
+      "productFacts": {
+        "specifications": "Driver dinamis, koneksi kabel 3.5mm, bantalan over-ear",
+        "defects": "Bekas pemakaian ringan pada bantalan",
+        "accessories": [
+          "Kabel audio 3.5mm",
+          "Adapter"
+        ],
+        "warranty": "Garansi tidak tersedia"
+      },
+      "imageUrl": "https://example.com/headphone-studio-lite.jpg",
+      "startingPrice": 800000,
+      "currentPrice": 800000,
+      "minIncrement": 25000,
+      "durationSeconds": 28800,
+      "bidCount": 0,
+      "status": "live",
+      "endsAt": "2026-10-15T18:00:00.000Z",
+      "visualPosition": "0% 0%",
+      "version": 2,
+      "startsAt": "2026-10-13T10:00:00.000Z",
+      "highestBidderId": null,
+      "createdAt": "2026-10-13T10:00:00.000Z",
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "title": "Mechanical Keyboard Compact",
+      "description": "Keyboard mekanikal compact dengan layout ringkas dan switch linear.",
+      "condition": "new",
+      "productFacts": {
+        "specifications": "Layout compact, switch mekanikal linear, koneksi USB-C",
+        "defects": "Kondisi baik, seluruh tombol berfungsi menurut seller",
+        "accessories": [
+          "Kabel USB-C",
+          "Keycap puller"
+        ],
+        "warranty": null
+      },
+      "imageUrl": "https://example.com/test.jpg",
+      "startingPrice": 1000000,
+      "minIncrement": 50000,
+      "durationSeconds": 180,
+      "id": 7,
+      "sellerId": 2,
+      "seller": "rania.shop",
+      "category": "electronics",
+      "status": "ended",
+      "currentPrice": 1000000,
+      "bidCount": 0,
+      "version": 2,
+      "createdAt": "2026-10-14T02:47:24.166Z",
+      "visualPosition": "50% 100%",
+      "startsAt": "2026-10-14T02:47:27.653Z",
+      "endsAt": "2026-10-14T03:47:32.618Z",
+      "highestBidderId": null,
+      "winnerId": null,
+      "finalPrice": null
+    },
+    {
+      "title": "Updated Draft Auction",
+      "description": "This is a draft auction for testing access control",
+      "condition": "new",
+      "productFacts": {
+        "specifications": "Test",
+        "defects": "None",
+        "accessories": [],
+        "warranty": "1 year"
+      },
+      "imageUrl": "https://example.com/test.jpg",
+      "startingPrice": 1000000,
+      "minIncrement": 50000,
+      "durationSeconds": 180,
+      "id": 8,
+      "sellerId": 2,
+      "seller": "rania.shop",
+      "category": "electronics",
+      "status": "draft",
+      "currentPrice": 1000000,
+      "bidCount": 0,
+      "version": 0,
+      "createdAt": "2026-10-14T02:48:25.081Z",
+      "visualPosition": "50% 50%",
+      "updatedAt": "2026-10-14T02:48:39.112Z",
+      "highestBidderId": null,
+      "winnerId": null,
+      "finalPrice": null
+    }
+  ],
+  "bids": [],
+  "aiInteractions": []
+}

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createMockAccessToken, createMockServer } from '../mock/start.mjs';
 
-const fixturePath = fileURLToPath(new URL('../mock/db.json', import.meta.url));
+const fixturePath = fileURLToPath(new URL('../mock/db.test.json', import.meta.url));
 const testJwtSecret = randomBytes(32).toString('base64url');
 
 async function createHarness(t) {
