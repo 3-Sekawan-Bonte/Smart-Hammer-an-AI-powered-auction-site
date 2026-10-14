@@ -56,8 +56,22 @@ function createAIInteractionService({
   User,
   provider = createOpenAIProvider(),
   rateLimiter = createAIQuestionRateLimiter(),
+  eventPublisher,
   clock = () => new Date(),
 }) {
+  function publish(event, interaction, message) {
+    try {
+      eventPublisher?.publishAIInteraction(event, {
+        auctionId: interaction.auctionId,
+        version: interaction.sourceVersion,
+        interaction: interactionToJSON(interaction),
+        ...(message ? { message } : {}),
+      });
+    } catch (_error) {
+      // Socket delivery is best-effort; persisted Q&A state remains authoritative.
+    }
+  }
+
   async function getAccessibleAuction(id, userId) {
     const auction = await Auction.findByPk(id);
     if (!auction || (auction.status === 'draft' && auction.sellerId !== userId)) throw notFound();
@@ -88,13 +102,19 @@ function createAIInteractionService({
       snapshotAt,
       errorCode: null,
     });
+    publish('ai:pending', interaction);
 
     let result;
     try {
       result = await provider.answerQuestion({ question, context });
     } catch (error) {
       const errorCode = SAFE_PROVIDER_CODES.has(error?.code) ? error.code : 'AI_UNAVAILABLE';
-      await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode });
+      try {
+        await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode });
+        publish('ai:error', interaction, 'The AI answer service is temporarily unavailable.');
+      } catch (_persistError) {
+        // No error event is sent unless the failed state was persisted.
+      }
       throw new HttpError(503, 'AI_UNAVAILABLE', 'The AI answer service is temporarily unavailable.');
     }
 
@@ -105,6 +125,7 @@ function createAIInteractionService({
         status: 'completed',
         errorCode: null,
       });
+      publish('ai:message', interaction);
     } catch (_error) {
       try { await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode: 'AI_UNAVAILABLE' }); } catch (_persistError) { /* Database failure prevents recording the final state. */ }
       throw new HttpError(500, 'INTERNAL_ERROR', 'The AI interaction could not be saved.');
