@@ -13,7 +13,7 @@
 ## 2. Stack
 
 - Frontend: JavaScript, React, Vite, Tailwind CSS v4, React Router, Redux Toolkit (`@reduxjs/toolkit`), React Redux (`react-redux`), Axios, Socket.IO Client.
-- Backend: Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT (expiry 7 hari), bcrypt, OpenAI API (`gpt-4o-mini`) via raw HTTP call (tanpa SDK `openai`).
+- Backend: Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT (expiry 7 hari), bcryptjs, OpenAI API (`gpt-4o-mini`) via raw HTTP call (tanpa SDK `openai`).
 - Testing backend: Jest dan Supertest.
 - Kategori lelang: seller memilih dari daftar tetap subkategori elektronik (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`); backend memvalidasi nilai.
 - Uang: integer rupiah. Batas MVP yang ditetapkan pada kontrak awal adalah Rp1–Rp2.000.000.000 untuk nominal dan hasil penjumlahannya.
@@ -87,7 +87,7 @@ Arus backend yang diutamakan: `Route → Middleware → Controller → Service �
 | `id` | Primary key |
 | `username` | Wajib, 2–40 karakter |
 | `email` | Wajib, unique, lowercase; maksimal 254 karakter |
-| `password` | Hash bcrypt; jangan pernah dikirim dalam response |
+| `password` | Hash bcryptjs; jangan pernah dikirim dalam response |
 | `createdAt`, `updatedAt` | Timestamp Sequelize |
 
 ### 5.2 `Auctions`
@@ -241,7 +241,7 @@ Tidak ada endpoint publik untuk menetapkan pemenang.
 - `fields` dan `details` selalu berupa object (kosong bila tidak diperlukan).
 - Tolak unknown field pada mutation.
 - Pagination default page 1, limit 10, maksimal limit 50.
-- Register: username 2–40 karakter, email valid maksimal 254 karakter dan lowercase, password minimal 8 karakter dan maksimal 72 byte UTF-8 untuk bcrypt.
+- Register: username 2–40 karakter, email valid maksimal 254 karakter dan lowercase, password minimal 8 karakter dan maksimal 72 byte UTF-8 untuk bcryptjs.
 - Pertanyaan AI 3–500 karakter; rate limit awal 1 pertanyaan/user/10 detik.
 
 ### Error code utama

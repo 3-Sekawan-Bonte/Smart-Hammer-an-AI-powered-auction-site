@@ -19,7 +19,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 1 — Database
 
-- [ ] Buat model dan migration `User`.
+- [x] Buat model dan migration `User`.
 - [ ] Buat model dan migration `Auction`.
 - [ ] Buat model dan migration `Bid` dengan unique `(userId, clientRequestId)`.
 - [ ] Buat model dan migration `AIInteraction`, termasuk `visibility`, `missingInformation`, `sourceVersion`, `snapshotAt`, dan `errorCode` sesuai kontrak.
@@ -32,12 +32,14 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 2 — Authentication
 
-- [ ] `POST /users/register` dengan validasi dan hash bcrypt.
-- [ ] `POST /users/login` dengan JWT.
-- [ ] `GET /users/me` untuk pemulihan sesi.
-- [ ] Middleware JWT untuk route terlindungi.
-- [ ] Pastikan respons tidak mengandung password/hash.
-- [ ] Tambahkan tests register, login, token invalid, dan email duplikat.
+- [x] `POST /users/register` dengan validasi dan hash bcryptjs.
+- [x] `POST /users/login` dengan JWT.
+- [x] Verifikasi password login menggunakan bcryptjs dan normalisasi email ke lowercase.
+- [x] `GET /users/me` untuk pemulihan sesi.
+- [x] Middleware JWT untuk route terlindungi; identitas diambil dari subject JWT terverifikasi.
+- [x] Validasi input autentikasi, tolak field yang tidak dikenal, dan gunakan format error standar.
+- [x] Pastikan respons tidak mengandung password/hash.
+- [ ] Jalankan dan verifikasi automated tests register, login, input invalid, password salah, token hilang/invalid, `GET /users/me`, password hash tidak terekspos, dan email duplikat.
 
 **Checkpoint:** register/login/restore-session berfungsi dan error mengikuti kontrak.
 
