@@ -1,18 +1,21 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { createMockServer } from '../mock/start.mjs';
+import { createMockAccessToken, createMockServer } from '../mock/start.mjs';
 
 const fixturePath = fileURLToPath(new URL('../mock/db.json', import.meta.url));
+const testJwtSecret = randomBytes(32).toString('base64url');
 
 async function createHarness(t) {
   const directory = await mkdtemp(join(tmpdir(), 'smart-hammer-fe01-'));
   const databasePath = join(directory, 'db.json');
   await copyFile(fixturePath, databasePath);
-  const server = createMockServer({ databasePath });
+  const server = createMockServer({ databasePath, jwtSecret: testJwtSecret });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -35,15 +38,15 @@ async function createHarness(t) {
     assert.equal(response.status, 200);
     return (await response.json()).data.access_token;
   };
-  return { request, login };
+  return { request, login, databasePath };
 }
 
 function auth(token) {
   return { Authorization: `Bearer ${token}` };
 }
 
-test('register returns only the new user; login and session restoration use the documented envelope', async (t) => {
-  const { request } = await createHarness(t);
+test('register hashes credentials and login returns a signed token accepted by session restoration', async (t) => {
+  const { request, databasePath } = await createHarness(t);
   const registration = await request('/users/register', {
     method: 'POST',
     body: JSON.stringify({ username: '  Buyer Test ', email: 'NEW.USER@EXAMPLE.COM', password: 'DemoPass123!' }),
@@ -53,6 +56,11 @@ test('register returns only the new user; login and session restoration use the 
   assert.deepEqual(registeredBody.data.user, { id: 5, username: 'Buyer Test', email: 'new.user@example.com' });
   assert.equal('access_token' in registeredBody.data, false);
   assert.equal('password' in registeredBody.data.user, false);
+  assert.equal('passwordHash' in registeredBody.data.user, false);
+  const storedDatabase = JSON.parse(await readFile(databasePath, 'utf8'));
+  const storedNewUser = storedDatabase.users.find((user) => user.id === 5);
+  assert.equal('password' in storedNewUser, false);
+  assert.match(storedNewUser.passwordHash, /^scrypt\$[\w-]+\$[\w-]+$/);
 
   const anonymousProfile = await request('/users/me');
   assert.equal(anonymousProfile.status, 401);
@@ -65,10 +73,27 @@ test('register returns only the new user; login and session restoration use the 
   assert.equal(loginBody.data.user.id, 5);
   assert.equal(loginBody.data.tokenType, 'Bearer');
   assert.equal(loginBody.data.expiresIn, 86400);
-  assert.match(loginBody.data.access_token, /^mock-user-5$/);
+  assert.match(loginBody.data.access_token, /^[\w-]+\.[\w-]+\.[\w-]+$/);
+  assert.equal(JSON.parse(Buffer.from(loginBody.data.access_token.split('.')[0], 'base64url').toString()).alg, 'HS256');
 
   const profile = await request('/users/me', { headers: auth(loginBody.data.access_token) });
   assert.deepEqual((await profile.json()).data.user, registeredBody.data.user);
+});
+
+test('mock JWT rejects tampered and expired sessions', async (t) => {
+  const { request, login } = await createHarness(t);
+  const token = await login();
+  const [header, payload, signature] = token.split('.');
+  const tamperedSignature = `${signature.startsWith('a') ? 'b' : 'a'}${signature.slice(1)}`;
+  const tampered = `${header}.${payload}.${tamperedSignature}`;
+  const invalid = await request('/users/me', { headers: auth(tampered) });
+  assert.equal(invalid.status, 401);
+  assert.equal((await invalid.json()).error.code, 'UNAUTHORIZED');
+
+  const expired = createMockAccessToken(1, testJwtSecret, Date.now() - 86_401_000);
+  const expiredResponse = await request('/users/me', { headers: auth(expired) });
+  assert.equal(expiredResponse.status, 401);
+  assert.equal((await expiredResponse.json()).error.code, 'UNAUTHORIZED');
 });
 
 test('auth rejects invalid input and returns the same credential error for unknown users', async (t) => {
@@ -83,6 +108,13 @@ test('auth rejects invalid input and returns the same credential error for unkno
   assert.ok(invalidBody.error.fields.email);
   assert.ok(invalidBody.error.fields.password);
   assert.deepEqual(invalidBody.error.details, {});
+
+  const shortUtf8Password = await request('/users/register', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'Byte Test', email: 'byte@example.com', password: '😀' }),
+  });
+  assert.equal(shortUtf8Password.status, 400);
+  assert.ok((await shortUtf8Password.json()).error.fields.password);
 
   const duplicate = await request('/users/register', {
     method: 'POST',

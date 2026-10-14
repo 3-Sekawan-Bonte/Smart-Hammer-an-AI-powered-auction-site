@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { GavelIcon, LogoutIcon } from './Icons';
 
@@ -8,6 +8,11 @@ function Brand() {
 
 export default function Layout() {
   const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <>
@@ -23,7 +28,7 @@ export default function Layout() {
             {isAuthenticated ? (
               <>
                 <span className="user-chip"><span>{user?.username?.slice(0, 2).toUpperCase()}</span>{user?.username}</span>
-                <button className="btn btn-ghost nav-logout" type="button" onClick={logout}><LogoutIcon /> Keluar</button>
+                <button className="btn btn-ghost nav-logout" type="button" onClick={handleLogout}><LogoutIcon /> Keluar</button>
               </>
             ) : (
               <NavLink className="btn btn-ghost nav-login" to="/login">Masuk</NavLink>

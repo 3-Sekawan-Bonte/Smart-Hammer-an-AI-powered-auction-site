@@ -5,33 +5,33 @@
       "id": 1,
       "username": "demo.bidder",
       "email": "demo@smart-hammer.id",
-      "password": "smart123",
       "role": "buyer",
-      "createdAt": "2026-10-13T05:00:00.000Z"
+      "createdAt": "2026-10-13T05:00:00.000Z",
+      "passwordHash": "scrypt$GR6bZBG0ZyoGxGAy3fWZIg$6PcWIQGEtw8qC25YuTSIo2q0uH5jHx9Di2Mja4-_XKmIoV88XyVvENb24adapN5RKe1KIbn5kp1nBBf2DSP6pw"
     },
     {
       "id": 2,
       "username": "rania.shop",
       "email": "seller@smart-hammer.id",
-      "password": "smart123",
       "role": "seller",
-      "createdAt": "2026-10-13T05:00:00.000Z"
+      "createdAt": "2026-10-13T05:00:00.000Z",
+      "passwordHash": "scrypt$a9aFuAwdtnFU93Kkucj98g$GkhexQ2MWYP4kzvlEOxQvARoeM-KHj1EZvZ6a3K9kLXO2z-4cneCPu8RLyoIUNsJlf0XbJgckXghJbdoGiuSQw"
     },
     {
       "id": 3,
       "username": "testuser",
       "email": "test@test.com",
-      "password": "password123",
       "role": "buyer",
-      "createdAt": "2026-10-13T17:56:15.717Z"
+      "createdAt": "2026-10-13T17:56:15.717Z",
+      "passwordHash": "scrypt$tIIF89UoQwBCLzHasrwD-g$EtxW_M9it3IFZkctxFV-dS4RcSaE01uTPC97Dhn16Jyx8FT8rZMpS6mCDe-SdO0JtLEzkmHIfVFRMzjPznWgWQ"
     },
     {
       "id": "4",
       "username": "testuser2",
       "email": "test2@test.com",
-      "password": "password123",
       "role": "buyer",
-      "createdAt": "2026-10-14T02:47:13.779Z"
+      "createdAt": "2026-10-14T02:47:13.779Z",
+      "passwordHash": "scrypt$XPf1iLEURUZcj9PRJNEO1Q$fFho6VFqpAha5TgQ3JZ1Lyi-gRXwEosIE5UeKAFC7JVukkrymbXBKXtf33SPPsOvPb3CrBkAHfHWSP3viCIUOA"
     }
   ],
   "auctions": [

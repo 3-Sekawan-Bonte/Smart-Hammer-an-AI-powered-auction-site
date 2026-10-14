@@ -32,8 +32,9 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const syncLogout = (event) => {
-      if (event.key === 'smart_hammer_access_token' && !event.newValue) {
+      if (event.key === 'smart_hammer_access_token') {
         dispatch(logoutAction());
+        if (event.newValue) dispatch(restoreSession());
       }
     };
     window.addEventListener('storage', syncLogout);

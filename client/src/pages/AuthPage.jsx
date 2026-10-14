@@ -10,6 +10,7 @@ export default function AuthPage({ mode }) {
   const location = useLocation();
   const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '' });
   const [formError, setFormError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -17,20 +18,27 @@ export default function AuthPage({ mode }) {
     event.preventDefault();
     clearAuthError();
     setFormError(null);
-    
-    if (isRegister && form.password !== form.confirmPassword) {
-      setFormError('Konfirmasi password tidak cocok.');
-      return;
+    setFieldErrors({});
+    const errors = {};
+    const normalizedEmail = form.email.trim();
+    if (normalizedEmail.length > 254 || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      errors.email = 'Masukkan alamat email yang valid (maksimal 254 karakter).';
     }
     if (isRegister && (form.username.trim().length < 2 || form.username.trim().length > 40)) {
-      setFormError('Username harus terdiri dari 2–40 karakter.');
+      errors.username = 'Username harus terdiri dari 2–40 karakter.';
+    }
+    const passwordBytes = new TextEncoder().encode(form.password).length;
+    if (passwordBytes < 8 || passwordBytes > 72) {
+      errors.password = 'Password harus terdiri dari 8–72 byte.';
+    }
+    if (isRegister && form.password !== form.confirmPassword) {
+      errors.confirmPassword = 'Konfirmasi password tidak cocok.';
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
       return;
     }
-    if (isRegister && (form.password.length < 8 || new TextEncoder().encode(form.password).length > 72)) {
-      setFormError('Password harus terdiri dari 8–72 byte.');
-      return;
-    }
-    
+
     try {
       if (isRegister) {
         await register(form);
@@ -41,7 +49,13 @@ export default function AuthPage({ mode }) {
         navigate(location.state?.from || '/', { replace: true });
       }
     } catch (err) {
-      setFormError(err.message);
+      if (err && typeof err === 'object') {
+        const serverFields = err.fields || {};
+        setFieldErrors(serverFields);
+        setFormError(Object.keys(serverFields).length ? null : err.message || 'Permintaan gagal. Coba lagi.');
+      } else {
+        setFormError(typeof err === 'string' ? err : 'Permintaan gagal. Coba lagi.');
+      }
     }
   };
 
@@ -78,7 +92,10 @@ export default function AuthPage({ mode }) {
                   value={form.username}
                   onChange={(event) => setForm({ ...form, username: event.target.value })}
                   autoComplete="username"
+                  aria-invalid={Boolean(fieldErrors.username)}
+                  aria-describedby={fieldErrors.username ? 'username-error' : undefined}
                 />
+                {fieldErrors.username && <small className="field-error" id="username-error">{fieldErrors.username}</small>}
               </div>
             )}
             <div className="field">
@@ -91,7 +108,11 @@ export default function AuthPage({ mode }) {
                 value={form.email}
                 onChange={(event) => setForm({ ...form, email: event.target.value })}
                 autoComplete="email"
+                maxLength={254}
+                aria-invalid={Boolean(fieldErrors.email)}
+                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
               />
+              {fieldErrors.email && <small className="field-error" id="email-error">{fieldErrors.email}</small>}
             </div>
             <div className="field">
               <label htmlFor="password">Password</label>
@@ -100,11 +121,13 @@ export default function AuthPage({ mode }) {
                   className="input"
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  minLength="8"
                   required
                   value={form.password}
                   onChange={(event) => setForm({ ...form, password: event.target.value })}
                   autoComplete={isRegister ? 'new-password' : 'current-password'}
+                  maxLength={72}
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 />
                 <button
                   type="button"
@@ -115,6 +138,7 @@ export default function AuthPage({ mode }) {
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
               </div>
+              {fieldErrors.password && <small className="field-error" id="password-error">{fieldErrors.password}</small>}
             </div>
             {isRegister && (
               <div className="field">
@@ -124,11 +148,13 @@ export default function AuthPage({ mode }) {
                     className="input"
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    minLength="8"
                     required
                     value={form.confirmPassword}
                     onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })}
                     autoComplete="new-password"
+                    maxLength={72}
+                    aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                    aria-describedby={fieldErrors.confirmPassword ? 'confirm-password-error' : undefined}
                   />
                   <button
                     type="button"
@@ -139,9 +165,12 @@ export default function AuthPage({ mode }) {
                     {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
+                {fieldErrors.confirmPassword && <small className="field-error" id="confirm-password-error">{fieldErrors.confirmPassword}</small>}
               </div>
             )}
-            {(formError || authError) && <p className="form-error" role="alert">{formError || authError}</p>}
+            {(formError || (authError && !Object.keys(authError.fields || {}).length)) && (
+              <p className="form-error" role="alert">{formError || (typeof authError === 'string' ? authError : authError?.message)}</p>
+            )}
             <button className="btn btn-primary" disabled={authLoading} type="submit">
               {authLoading ? 'Memproses...' : isRegister ? 'Buat akun' : 'Masuk'}
               {!authLoading && <ArrowIcon />}

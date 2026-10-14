@@ -192,6 +192,8 @@ textarea.input { min-height: 128px; resize: vertical; }
 .password-toggle:hover { color: var(--ink); }
 .helper { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .form-error { margin: 0; border: 1px solid #ffc5ca; border-radius: 12px; background: #fff1f2; color: #b32736; padding: 11px 13px; font-size: 12px; font-weight: 700; }
+.field-error { display: block; margin-top: 6px; color: #b32736; font-size: 12px; line-height: 1.45; }
+.input[aria-invalid="true"] { border-color: #d84b58; }
 .form-card .form-error { margin-bottom: 20px; }
 
 .sell-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 28px; align-items: start; }
@@ -326,7 +328,7 @@ textarea.input { min-height: 128px; resize: vertical; }
   .container { width: min(100% - 28px, 1240px); }
   .nav { min-height: 68px; flex-wrap: wrap; row-gap: 5px; padding-block: 8px; }
   .nav-links { order: 3; flex-basis: 100%; justify-content: space-around; }
-  .nav-actions .nav-logout { display: none; }
+  .nav-actions .nav-logout { display: inline-flex; }
   .nav-actions .nav-login { display: inline-flex; }
   .nav-actions .btn { min-height: 40px; padding: 0 12px; font-size: 11px; }
   .brand { font-size: 18px; }

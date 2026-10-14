@@ -1,10 +1,24 @@
-import { randomUUID } from 'node:crypto';
+import {
+  createHmac,
+  randomBytes,
+  randomUUID,
+  scrypt as scryptCallback,
+  timingSafeEqual,
+} from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const defaultDatabasePath = process.env.BIDWAR_MOCK_DB || fileURLToPath(new URL('./db.json', import.meta.url));
 const defaultPort = Number(process.env.BIDWAR_MOCK_PORT || 3001);
+const configuredMockJwtSecret = process.env.BIDWAR_MOCK_JWT_SECRET;
+if (configuredMockJwtSecret && Buffer.byteLength(configuredMockJwtSecret, 'utf8') < 32) {
+  throw new Error('BIDWAR_MOCK_JWT_SECRET harus memiliki setidaknya 32 byte.');
+}
+const defaultMockJwtSecret = configuredMockJwtSecret || randomBytes(32).toString('base64url');
+const JWT_EXPIRES_IN = 86400;
+const scrypt = promisify(scryptCallback);
 const MAX_AMOUNT = 2_000_000_000;
 const CONDITIONS = new Set(['new', 'used_good', 'used_fair']);
 const AUCTION_FIELDS = new Set([
@@ -60,10 +74,64 @@ function selfUser(user) {
   return user ? { ...publicUser(user), email: user.email } : null;
 }
 
-function getCurrentUser(database, request) {
-  const match = /^Bearer mock-user-(\d+)$/.exec(request.headers.authorization || '');
-  if (!match) return null;
-  return database.users.find((user) => Number(user.id) === Number(match[1])) || null;
+export async function hashMockPassword(password) {
+  const salt = randomBytes(16);
+  const derivedKey = await scrypt(password, salt, 64);
+  return `scrypt$${salt.toString('base64url')}$${derivedKey.toString('base64url')}`;
+}
+
+async function verifyMockPassword(password, storedHash) {
+  const [algorithm, saltText, digestText, extra] = String(storedHash || '').split('$');
+  if (algorithm !== 'scrypt' || !saltText || !digestText || extra) return false;
+  try {
+    const salt = Buffer.from(saltText, 'base64url');
+    const expected = Buffer.from(digestText, 'base64url');
+    if (salt.length < 16 || expected.length !== 64) return false;
+    const actual = await scrypt(password, salt, expected.length);
+    return timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+export function createMockAccessToken(userId, secret, now = Date.now()) {
+  const issuedAt = Math.floor(now / 1000);
+  const header = encodeBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = encodeBase64Url(JSON.stringify({ sub: String(userId), iat: issuedAt, exp: issuedAt + JWT_EXPIRES_IN }));
+  const content = `${header}.${payload}`;
+  const signature = createHmac('sha256', secret).update(content).digest('base64url');
+  return `${content}.${signature}`;
+}
+
+function verifyMockAccessToken(token, secret, now = Date.now()) {
+  if (typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3 || parts.some((part) => !part)) return null;
+  const [headerText, payloadText, signatureText] = parts;
+  try {
+    const header = JSON.parse(Buffer.from(headerText, 'base64url').toString('utf8'));
+    const payload = JSON.parse(Buffer.from(payloadText, 'base64url').toString('utf8'));
+    if (header.alg !== 'HS256' || header.typ !== 'JWT' || !/^[1-9]\d*$/.test(payload.sub || '') ||
+        !Number.isSafeInteger(payload.exp) || payload.exp <= Math.floor(now / 1000) ||
+        !Number.isSafeInteger(payload.iat) || payload.iat > Math.floor(now / 1000) + 60) return null;
+    const expectedSignature = createHmac('sha256', secret).update(`${headerText}.${payloadText}`).digest();
+    const presentedSignature = Buffer.from(signatureText, 'base64url');
+    if (presentedSignature.length !== expectedSignature.length || !timingSafeEqual(presentedSignature, expectedSignature)) return null;
+    return Number(payload.sub);
+  } catch {
+    return null;
+  }
+}
+
+function getCurrentUser(database, request, jwtSecret) {
+  const match = /^Bearer (\S+)$/.exec(request.headers.authorization || '');
+  const userId = match ? verifyMockAccessToken(match[1], jwtSecret) : null;
+  if (!userId) return null;
+  return database.users.find((user) => Number(user.id) === userId) || null;
 }
 
 function isOwner(auction, user) {
@@ -159,7 +227,8 @@ function validateAuthBody(body, registerMode = false) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
   if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) fields.email = 'Email tidak valid.';
-  if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) fields.password = 'Password harus 8–72 byte.';
+  const passwordBytes = Buffer.byteLength(password, 'utf8');
+  if (passwordBytes < 8 || passwordBytes > 72) fields.password = 'Password harus 8–72 byte.';
   let username;
   if (registerMode) {
     username = typeof body.username === 'string' ? body.username.trim() : '';
@@ -231,7 +300,7 @@ function normalizeFacts(facts = {}) {
   };
 }
 
-export function createMockServer({ databasePath = defaultDatabasePath } = {}) {
+export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret = defaultMockJwtSecret } = {}) {
   return createServer(async (request, response) => {
     if (request.method === 'OPTIONS') return send(response, 204);
     try {
@@ -247,7 +316,13 @@ export function createMockServer({ databasePath = defaultDatabasePath } = {}) {
           return errorResponse(response, 409, 'EMAIL_EXISTS', 'Email sudah terdaftar.', { email: 'Email sudah terdaftar.' });
         }
         const id = Math.max(0, ...database.users.map((user) => Number(user.id) || 0)) + 1;
-        const user = { id, username, email, password, createdAt: new Date().toISOString() };
+        const user = {
+          id,
+          username,
+          email,
+          passwordHash: await hashMockPassword(password),
+          createdAt: new Date().toISOString(),
+        };
         database.users.push(user);
         await saveDatabase(databasePath, database);
         return send(response, 201, { message: 'Register berhasil.', data: { user: selfUser(user) } });
@@ -257,15 +332,23 @@ export function createMockServer({ databasePath = defaultDatabasePath } = {}) {
         const body = await readBody(request);
         const { fields, email, password } = validateAuthBody(body);
         if (Object.keys(fields).length) return errorResponse(response, 400, 'VALIDATION_ERROR', 'Email dan password wajib diisi.', fields);
-        const user = database.users.find((entry) => entry.email.toLowerCase() === email && entry.password === password);
-        if (!user) return errorResponse(response, 401, 'INVALID_CREDENTIALS', 'Email atau password salah.');
+        const user = database.users.find((entry) => entry.email.toLowerCase() === email);
+        let validPassword = user?.passwordHash ? await verifyMockPassword(password, user.passwordHash) : false;
+        // Upgrade older local mock data on its next successful login.
+        if (!validPassword && typeof user?.password === 'string' && user.password === password) {
+          user.passwordHash = await hashMockPassword(password);
+          delete user.password;
+          await saveDatabase(databasePath, database);
+          validPassword = true;
+        }
+        if (!user || !validPassword) return errorResponse(response, 401, 'INVALID_CREDENTIALS', 'Email atau password salah.');
         return send(response, 200, {
           message: 'Login berhasil.',
-          data: { access_token: `mock-user-${user.id}`, tokenType: 'Bearer', expiresIn: 86400, user: selfUser(user) },
+          data: { access_token: createMockAccessToken(user.id, jwtSecret), tokenType: 'Bearer', expiresIn: JWT_EXPIRES_IN, user: selfUser(user) },
         });
       }
 
-      const currentUser = getCurrentUser(database, request);
+      const currentUser = getCurrentUser(database, request, jwtSecret);
       if (!currentUser) return errorResponse(response, 401, 'UNAUTHORIZED', 'Silakan login untuk melanjutkan.');
 
       if (pathname === '/users/me' && request.method === 'GET') {
