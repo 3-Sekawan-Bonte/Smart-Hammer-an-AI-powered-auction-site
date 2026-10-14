@@ -5,7 +5,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 ## Phase 0 — Kunci scope dan fondasi
 
 - [x] FE-01 Frontend Foundation: autentikasi Redux, proteksi route, marketplace awal, dan kontrak mock API. Seller draft lifecycle, pagination, dan auction detail diselesaikan pada FE-03.
-- [x] FE-02 Authentication: register/login, pemulihan sesi, proteksi route, logout, dan tes tetap terverifikasi.
+- [x] FE-02 Authentication: register/login, pemulihan sesi, proteksi route, logout pada mobile, error terstruktur, dan tes terverifikasi pada mock. Baca `FE02_CHANGELOG.md` dan `FE02_IMPLEMENTATION_REPORT.md`; BE-03 produksi tetap belum selesai.
 - [x] FE-03 Auction UI: listing/pagination, create draft, owner-only edit draft, detail, start dengan konfirmasi, mock API lifecycle, dan validasi FE-03 terverifikasi. Lihat `FE03_IMPLEMENTATION_REPORT.md`.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
@@ -34,6 +34,8 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 **Checkpoint:** model, relasi, migration, dan seed dapat digunakan oleh service.
 
 ## Phase 2 — Authentication
+
+**Development-only auth simulator:** FE-02 can use the contract mock documented in `BE03_MOCK_IMPLEMENTATION.md`. Production BE-03 remains unchecked below.
 
 - [ ] `POST /users/register` dengan validasi dan hash bcrypt.
 - [ ] `POST /users/login` dengan JWT.
