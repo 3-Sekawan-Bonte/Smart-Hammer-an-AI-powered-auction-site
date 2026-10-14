@@ -1,6 +1,6 @@
 const HttpError = require('../utils/httpError');
 
-function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = () => new Date(), eventPublisher }) {
+function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = () => new Date(), eventPublisher, auctioneer }) {
   const auctionIncludes = User ? [
     { model: User, as: 'seller', attributes: ['id', 'username'], required: false },
     { model: User, as: 'highestBidder', attributes: ['id', 'username'], required: false },
@@ -23,6 +23,9 @@ function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = ()
         order: [['createdAt', 'DESC'], ['id', 'DESC']],
         transaction,
       });
+      const bidCount = typeof Bid.count === 'function'
+        ? await Bid.count({ where: { auctionId }, transaction })
+        : (lastBid ? 1 : 0);
       const hasBids = Boolean(lastBid);
       const winnerId = hasBids ? auction.highestBidderId : null;
       await auction.update({
@@ -33,12 +36,17 @@ function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = ()
       const updatedAuction = User
         ? await Auction.findByPk(auctionId, { transaction, include: auctionIncludes })
         : auction;
-      return { closed: true, auction: updatedAuction, finalPrice: hasBids ? auction.currentPrice : null };
+      return { closed: true, auction: updatedAuction, finalPrice: hasBids ? auction.currentPrice : null, bidCount };
     });
-    if (result.closed) eventPublisher?.publish('auction:ended', result.auction, {
-      winner: result.auction.winner ? { id: result.auction.winner.id, username: result.auction.winner.username } : null,
-      finalPrice: result.finalPrice,
-    });
+    if (result.closed) {
+      try {
+        eventPublisher?.publish('auction:ended', result.auction, {
+          winner: result.auction.winner ? { id: result.auction.winner.id, username: result.auction.winner.username } : null,
+          finalPrice: result.finalPrice,
+        });
+      } catch (_error) { /* Socket delivery cannot undo committed closure. */ }
+      try { auctioneer?.trigger({ auction: result.auction, trigger: 'end', triggerData: { bidCount: result.bidCount } }); } catch (_error) { /* Commentary never changes closure success. */ }
+    }
     return result;
   }
 

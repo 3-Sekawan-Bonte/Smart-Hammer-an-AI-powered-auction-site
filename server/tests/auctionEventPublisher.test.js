@@ -37,4 +37,21 @@ describe('auction event publisher', () => {
     publisher.attach({});
     expect(() => publisher.attach({})).toThrow('already has a Socket.IO server');
   });
+
+  test('publishes AI interactions only to their auction room with snapshot version metadata', () => {
+    const emit = jest.fn();
+    const publisher = createAuctionEventPublisher();
+    publisher.attach({ to: () => ({ emit }) });
+    publisher.publishAIInteraction('ai:message', {
+      auctionId: 12,
+      version: 4,
+      interaction: { id: 99, kind: 'commentary', status: 'completed', sourceVersion: 4 },
+    });
+    expect(emit).toHaveBeenCalledWith('ai:message', expect.objectContaining({
+      auctionId: 12,
+      version: 4,
+      serverNow: expect.any(String),
+      data: { interaction: expect.objectContaining({ kind: 'commentary', status: 'completed' }) },
+    }));
+  });
 });

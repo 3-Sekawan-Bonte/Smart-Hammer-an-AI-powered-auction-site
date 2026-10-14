@@ -47,7 +47,7 @@ function validateListQuery(query, userId) {
   return { page, limit, where };
 }
 
-function createAuctionService({ Auction, User, sequelize, eventPublisher }) {
+function createAuctionService({ Auction, User, sequelize, eventPublisher, auctioneer }) {
   const publicUserInclude = (as) => ({ model: User, as, attributes: ['id', 'username'], required: false });
   const associations = [publicUserInclude('seller'), publicUserInclude('highestBidder'), publicUserInclude('winner')];
 
@@ -134,7 +134,8 @@ function createAuctionService({ Auction, User, sequelize, eventPublisher }) {
         await auction.update({ startsAt, endsAt, status: 'live', version: auction.version + 1 }, { transaction });
         return Auction.findByPk(id, { include: associations, transaction });
       });
-      eventPublisher?.publish('auction:started', auction);
+      try { eventPublisher?.publish('auction:started', auction); } catch (_error) { /* Socket delivery cannot undo a committed start. */ }
+      try { auctioneer?.trigger({ auction, trigger: 'start', triggerData: { bidCount: 0 } }); } catch (_error) { /* Commentary never changes lifecycle success. */ }
       return auction;
     },
   };

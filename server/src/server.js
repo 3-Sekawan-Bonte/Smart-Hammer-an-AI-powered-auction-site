@@ -1,17 +1,19 @@
 require('dotenv').config();
 const http = require('node:http');
 const app = require('./app');
-const { sequelize, Auction, Bid, AIInteraction } = require('./models');
+const { sequelize, User, Auction, Bid, AIInteraction } = require('./models');
 const { createAuctionClosureService } = require('./services/auctionClosureService');
 const { createAuctionClosureScheduler } = require('./services/auctionClosureScheduler');
 const { createAIInteractionService } = require('./services/aiInteractionService');
+const { createAuctioneerService } = require('./services/auctioneerService');
 const { createAuctionEventPublisher } = require('./socket/auctionEventPublisher');
 const { createSocketServer } = require('./socket/createSocketServer');
 
 const port = Number(process.env.PORT || 3000);
 
 const eventPublisher = createAuctionEventPublisher();
-const dependencies = { sequelize, Auction, Bid, AIInteraction, eventPublisher };
+const auctioneer = createAuctioneerService({ AIInteraction, eventPublisher });
+const dependencies = { sequelize, User, Auction, Bid, AIInteraction, eventPublisher, auctioneer };
 
 const httpServer = http.createServer(app.createApp(dependencies));
 const io = createSocketServer(httpServer, dependencies);

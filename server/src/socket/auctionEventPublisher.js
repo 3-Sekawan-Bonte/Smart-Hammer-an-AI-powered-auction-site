@@ -17,6 +17,15 @@ function createAuctionEventPublisher() {
         data: { ...eventData, auction: state },
       });
     },
+    publishAIInteraction(event, { auctionId, version, interaction, message }) {
+      if (!io || !Number.isSafeInteger(auctionId) || !Number.isSafeInteger(version)) return;
+      io.to(`auction:${auctionId}`).emit(event, {
+        auctionId,
+        version,
+        serverNow: new Date().toISOString(),
+        data: { interaction, ...(message ? { message } : {}) },
+      });
+    },
   };
 }
 

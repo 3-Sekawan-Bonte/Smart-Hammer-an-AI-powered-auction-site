@@ -13,7 +13,7 @@ const input = {
   durationSeconds: 60,
 };
 
-function setup(overrides = {}, eventPublisher, failCommit = false) {
+function setup(overrides = {}, eventPublisher, failCommit = false, auctioneer) {
   const auction = {
     id: 12,
     sellerId: 5,
@@ -42,8 +42,8 @@ function setup(overrides = {}, eventPublisher, failCommit = false) {
   };
   const User = { name: 'User' };
   const transaction = { LOCK: { UPDATE: 'UPDATE' } };
-  const sequelize = { async transaction(callback) { const result = await callback(transaction); if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
-  return { service: createAuctionService({ Auction, User, sequelize, eventPublisher }), auction, transaction };
+  const sequelize = { async transaction(callback) { const result = await callback(transaction); this.committed = true; if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
+  return { service: createAuctionService({ Auction, User, sequelize, eventPublisher, auctioneer }), auction, transaction, sequelize };
 }
 
 describe('auction service lifecycle and permissions', () => {
@@ -117,6 +117,26 @@ describe('auction service lifecycle and permissions', () => {
     const rolledBack = setup({}, publisher, true);
     await expect(rolledBack.service.start(12, 5)).rejects.toThrow('commit failed');
     expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  test('schedules opening commentary after commit and never for a rolled-back start', async () => {
+    const auctioneer = { trigger: jest.fn(function trigger() { expect(state.sequelize.committed).toBe(true); return true; }) };
+    const state = setup({}, null, false, auctioneer);
+    await state.service.start(12, 5, new Date('2026-01-01T00:00:00.000Z'));
+    expect(auctioneer.trigger).toHaveBeenCalledWith(expect.objectContaining({ auction: state.auction, trigger: 'start' }));
+    await expect(state.service.start(12, 5)).rejects.toMatchObject({ code: 'AUCTION_NOT_DRAFT' });
+    expect(auctioneer.trigger).toHaveBeenCalledTimes(1);
+
+    const rolledBack = setup({}, null, true, auctioneer);
+    auctioneer.trigger.mockClear();
+    await expect(rolledBack.service.start(12, 5)).rejects.toThrow('commit failed');
+    expect(auctioneer.trigger).not.toHaveBeenCalled();
+  });
+
+  test('keeps a committed start successful when socket delivery throws', async () => {
+    const state = setup({}, { publish: jest.fn(() => { throw new Error('socket down'); }) });
+    await expect(state.service.start(12, 5)).resolves.toBe(state.auction);
+    expect(state.auction.status).toBe('live');
   });
 
   test('only deletes drafts owned by the authenticated user', async () => {
