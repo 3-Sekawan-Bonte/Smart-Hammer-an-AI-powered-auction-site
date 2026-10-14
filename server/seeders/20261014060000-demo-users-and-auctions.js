@@ -91,6 +91,9 @@ async function seedDemoData(queryInterface, env = process.env) {
       const now = new Date();
       await queryInterface.bulkInsert('Auctions', [{
         ...auction,
+        // bulkInsert has no model attribute metadata here, so serialize JSONB
+        // values explicitly for Sequelize's generic SQL value escaper.
+        productFacts: JSON.stringify(auction.productFacts),
         sellerId: seller.id,
         imageUrl: null,
         currentPrice: auction.startingPrice,
