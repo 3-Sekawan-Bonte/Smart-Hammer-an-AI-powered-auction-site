@@ -415,7 +415,15 @@ Ini hanya contoh bentuk state, bukan implementasi lengkap.
 - Restore session menggunakan `GET /users/me`. Token localStorage dapat dibaca JavaScript dan rentan terhadap XSS; jangan menyimpan password.
 - Jangan simpan state lelang ke localStorage sebagai sumber kebenaran; ambil snapshot dari backend saat refresh/reconnect.
 
-### 10.6 Contoh struktur frontend
+### 10.6 Preferensi tema dengan React Context
+
+- `ThemeContext`/`ThemeProvider` mengelola preferensi tampilan global (`light` atau `dark`) di luar Redux.
+- Simpan pilihan pengguna pada `localStorage` dengan key `smart-hammer-theme`; jika belum ada, ikuti `prefers-color-scheme`, lalu gunakan light sebagai fallback.
+- ThemeProvider membungkus seluruh route tanpa mengubah lifecycle Redux, autentikasi, atau Socket.IO.
+- Terapkan tema melalui `data-theme` pada elemen `<html>` dan token CSS global. Tema bukan sumber state bisnis dan tidak boleh mengubah data auction.
+- Redux Toolkit tetap bertanggung jawab untuk auth, auction/bidding, serta status socket; React Context hanya untuk preferensi tema.
+
+### 10.7 Contoh struktur frontend
 
 ```text
 client/src/
