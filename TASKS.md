@@ -7,6 +7,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] FE-01 Frontend Foundation: autentikasi Redux, proteksi route, marketplace awal, dan kontrak mock API. Seller draft lifecycle, pagination, dan auction detail diselesaikan pada FE-03.
 - [x] FE-02 Authentication: register/login, pemulihan sesi, proteksi route, logout pada mobile, error terstruktur, dan tes terverifikasi pada mock. Baca `FE02_CHANGELOG.md` dan `FE02_IMPLEMENTATION_REPORT.md`; BE-03 produksi tetap belum selesai.
 - [x] FE-03 Auction UI: listing/pagination, create draft, owner-only edit draft, detail, start dengan konfirmasi, mock API lifecycle, dan validasi FE-03 terverifikasi. Lihat `FE03_IMPLEMENTATION_REPORT.md`.
+- [x] FE-04 Auction Room State Management: snapshot Redux tervalidasi, merge bid/AI deduplicated, version guard, resync state, room isolation, selectors/hooks, dan reducer tests terverifikasi. Lihat `FE04_CHANGELOG.md`.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
 - [ ] Siapkan frontend React + Vite + Tailwind CSS.
@@ -98,7 +99,8 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Buat `src/lib/socket.js` service yang mengelola satu instance Socket.IO; jangan simpan instance socket di Redux.
 - [ ] Implementasikan join/leave, listener cleanup, reconnect, resync dan status koneksi.
 - [ ] Dispatch event socket ke Redux melalui action pada `auctionSlice` dan `socketSlice`.
-- [ ] Deduplicate event dan abaikan versi state yang lebih lama.
+- [ ] Integrasikan listener lifecycle Socket.IO dengan `processAuctionEvent`, recovery/reconnect, dan cleanup; reducer event FE-04 sudah tersedia.
+- [ ] Verifikasi deduplikasi event dan abaikan versi state yang lebih lama melalui integrasi dua sesi.
 - [ ] Uji dua browser dan perpindahan antar-room.
 
 **Checkpoint:** dua browser melihat harga, riwayat, deadline, dan status yang sama tanpa refresh.
