@@ -109,7 +109,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
 - [x] Simpan hasil `completed`/`failed` serta snapshot metadata.
 - [x] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
-- [ ] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
+- [x] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
 - [ ] Bangun AIPanel frontend dengan status pending/completed/failed.
 - [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
 

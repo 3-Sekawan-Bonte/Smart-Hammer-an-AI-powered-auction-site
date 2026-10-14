@@ -1,7 +1,7 @@
 const { createAIInteractionService, interactionToJSON } = require('../src/services/aiInteractionService');
 const { createAIQuestionRateLimiter } = require('../src/services/aiQuestionRateLimiter');
 
-function setup({ status = 'live', provider, now = new Date('2026-10-14T12:00:00.000Z') } = {}) {
+function setup({ status = 'live', provider, eventPublisher, now = new Date('2026-10-14T12:00:00.000Z') } = {}) {
   const auction = {
     id: 9,
     sellerId: 3,
@@ -41,7 +41,7 @@ function setup({ status = 'live', provider, now = new Date('2026-10-14T12:00:00.
   };
   const clock = () => new Date(now);
   const rateLimiter = createAIQuestionRateLimiter({ clock: () => now.getTime() });
-  const service = createAIInteractionService({ Auction, AIInteraction, User, provider, rateLimiter, clock });
+  const service = createAIInteractionService({ Auction, AIInteraction, User, provider, eventPublisher, rateLimiter, clock });
   return { service, auction, records, AIInteraction };
 }
 
@@ -61,11 +61,65 @@ describe('AI interaction service', () => {
     expect(provider.answerQuestion).toHaveBeenCalledTimes(1);
   });
 
+  test('broadcasts each Q&A state only after persistence to the corresponding auction room publisher', async () => {
+    const timeline = [];
+    const eventPublisher = { publishAIInteraction: jest.fn((event, payload) => {
+      timeline.push(`publish:${event}:${payload.interaction.status}`);
+      expect(payload.auctionId).toBe(9);
+      expect(payload.version).toBe(7);
+      expect(payload.interaction.auctionId).toBe(9);
+      expect(payload.interaction.sourceVersion).toBe(7);
+    }) };
+    const provider = { answerQuestion: jest.fn(async () => {
+      timeline.push('provider');
+      return { answer: 'Jawaban.', missingInformation: [] };
+    }) };
+    const state = setup({ provider, eventPublisher });
+    const originalCreate = state.AIInteraction.create;
+    state.AIInteraction.create = async (...args) => {
+      const record = await originalCreate(...args);
+      timeline.push(`persist:${record.status}`);
+      const update = record.update;
+      record.update = async (changes) => {
+        const updated = await update.call(record, changes);
+        timeline.push(`persist:${record.status}`);
+        return updated;
+      };
+      return record;
+    };
+    const record = await state.service.ask(22, 9, 'Apa kondisinya?');
+    expect(record.status).toBe('completed');
+    expect(eventPublisher.publishAIInteraction.mock.calls.map(([event]) => event)).toEqual(['ai:pending', 'ai:message']);
+    expect(timeline).toEqual([
+      'persist:pending', 'publish:ai:pending:pending', 'provider', 'persist:completed', 'publish:ai:message:completed',
+    ]);
+    expect(eventPublisher.publishAIInteraction.mock.calls[0][1]).toEqual(expect.objectContaining({
+      auctionId: 9, version: 7, interaction: expect.objectContaining({ status: 'pending', kind: 'question' }),
+    }));
+  });
+
   test('persists handled provider failure as failed without storing a fabricated answer', async () => {
     const provider = { answerQuestion: jest.fn(async () => { throw Object.assign(new Error('private details'), { code: 'AI_TIMEOUT' }); }) };
-    const { service, records } = setup({ provider });
+    const eventPublisher = { publishAIInteraction: jest.fn() };
+    const { service, records } = setup({ provider, eventPublisher });
     await expect(service.ask(22, 9, 'Apakah ada garansi?')).rejects.toMatchObject({ status: 503, code: 'AI_UNAVAILABLE' });
     expect(records[0]).toMatchObject({ status: 'failed', answer: null, missingInformation: [], errorCode: 'AI_TIMEOUT' });
+    expect(eventPublisher.publishAIInteraction.mock.calls.map(([event]) => event)).toEqual(['ai:pending', 'ai:error']);
+    expect(eventPublisher.publishAIInteraction.mock.calls[1][1]).toEqual(expect.objectContaining({
+      auctionId: 9, version: 7, interaction: expect.objectContaining({ status: 'failed', errorCode: 'AI_TIMEOUT' }),
+      message: 'The AI answer service is temporarily unavailable.',
+    }));
+    expect(JSON.stringify(eventPublisher.publishAIInteraction.mock.calls)).not.toContain('private details');
+  });
+
+  test('publisher failures do not invalidate persisted Q&A success or failure', async () => {
+    const eventPublisher = { publishAIInteraction: jest.fn(() => { throw new Error('socket internals'); }) };
+    const success = setup({ eventPublisher, provider: { answerQuestion: async () => ({ answer: 'Jawaban.', missingInformation: [] }) } });
+    await expect(success.service.ask(22, 9, 'Pertanyaan?')).resolves.toMatchObject({ status: 'completed' });
+
+    const failure = setup({ eventPublisher, provider: { answerQuestion: async () => { throw new Error('provider internals'); } } });
+    await expect(failure.service.ask(22, 9, 'Pertanyaan?')).rejects.toMatchObject({ status: 503, code: 'AI_UNAVAILABLE' });
+    expect(failure.records[0]).toMatchObject({ status: 'failed', errorCode: 'AI_UNAVAILABLE' });
   });
 
   test('enforces per-user rate limits before the second provider call', async () => {

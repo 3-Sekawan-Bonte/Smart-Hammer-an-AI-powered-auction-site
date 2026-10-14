@@ -21,7 +21,7 @@ eventPublisher.attach(io);
 
 const closureService = createAuctionClosureService({ ...dependencies });
 const closureScheduler = createAuctionClosureScheduler({ Auction, closureService });
-const aiInteractionService = createAIInteractionService({ Auction, AIInteraction });
+const aiInteractionService = createAIInteractionService({ Auction, AIInteraction, eventPublisher });
 
 sequelize.authenticate()
   .then(async () => {
