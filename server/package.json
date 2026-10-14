@@ -15,11 +15,13 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.1",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.5"
+    "sequelize": "^6.37.5",
+    "socket.io": "^4.8.4"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "sequelize-cli": "^6.6.2",
+    "socket.io-client": "^4.8.4",
     "supertest": "^7.0.0"
   }
 }

@@ -1,8 +1,13 @@
 const HttpError = require('../utils/httpError');
 
-function createAuctionClosureService({ Auction, Bid, sequelize, clock = () => new Date() }) {
+function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = () => new Date(), eventPublisher }) {
+  const auctionIncludes = User ? [
+    { model: User, as: 'seller', attributes: ['id', 'username'], required: false },
+    { model: User, as: 'highestBidder', attributes: ['id', 'username'], required: false },
+    { model: User, as: 'winner', attributes: ['id', 'username'], required: false },
+  ] : [];
   async function close(auctionId) {
-    return sequelize.transaction(async (transaction) => {
+    const result = await sequelize.transaction(async (transaction) => {
       const auction = await Auction.findByPk(auctionId, {
         transaction,
         lock: transaction.LOCK.UPDATE,
@@ -25,9 +30,16 @@ function createAuctionClosureService({ Auction, Bid, sequelize, clock = () => ne
         winnerId,
         version: auction.version + 1,
       }, { transaction });
-
-      return { closed: true, auction, finalPrice: hasBids ? auction.currentPrice : null };
+      const updatedAuction = User
+        ? await Auction.findByPk(auctionId, { transaction, include: auctionIncludes })
+        : auction;
+      return { closed: true, auction: updatedAuction, finalPrice: hasBids ? auction.currentPrice : null };
     });
+    if (result.closed) eventPublisher?.publish('auction:ended', result.auction, {
+      winner: result.auction.winner ? { id: result.auction.winner.id, username: result.auction.winner.username } : null,
+      finalPrice: result.finalPrice,
+    });
+    return result;
   }
 
   return { close };
