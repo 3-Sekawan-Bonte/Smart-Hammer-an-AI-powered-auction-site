@@ -47,7 +47,7 @@ function validateListQuery(query, userId) {
   return { page, limit, where };
 }
 
-function createAuctionService({ Auction, User, sequelize }) {
+function createAuctionService({ Auction, User, sequelize, eventPublisher }) {
   const publicUserInclude = (as) => ({ model: User, as, attributes: ['id', 'username'], required: false });
   const associations = [publicUserInclude('seller'), publicUserInclude('highestBidder'), publicUserInclude('winner')];
 
@@ -127,13 +127,15 @@ function createAuctionService({ Auction, User, sequelize }) {
     },
 
     async start(id, userId, now = new Date()) {
-      return sequelize.transaction(async (transaction) => {
+      const auction = await sequelize.transaction(async (transaction) => {
         const auction = await getOwnedDraft(id, userId, transaction);
         const startsAt = new Date(now);
         const endsAt = new Date(startsAt.getTime() + auction.durationSeconds * 1000);
         await auction.update({ startsAt, endsAt, status: 'live', version: auction.version + 1 }, { transaction });
         return Auction.findByPk(id, { include: associations, transaction });
       });
+      eventPublisher?.publish('auction:started', auction);
+      return auction;
     },
   };
 }

@@ -26,7 +26,12 @@ function isUniqueViolation(error) {
   return error?.name === 'SequelizeUniqueConstraintError' || error?.original?.code === '23505';
 }
 
-function createBidService({ Auction, Bid, sequelize }) {
+function createBidService({ Auction, Bid, User, sequelize, eventPublisher }) {
+  const auctionIncludes = User ? [
+    { model: User, as: 'seller', attributes: ['id', 'username'], required: false },
+    { model: User, as: 'highestBidder', attributes: ['id', 'username'], required: false },
+    { model: User, as: 'winner', attributes: ['id', 'username'], required: false },
+  ] : [];
   async function findExisting(userId, clientRequestId, transaction) {
     return Bid.findOne({ where: { userId, clientRequestId }, transaction });
   }
@@ -38,7 +43,7 @@ function createBidService({ Auction, Bid, sequelize }) {
 
   async function place(userId, auctionId, input) {
     try {
-      return await sequelize.transaction(async (transaction) => {
+      const result = await sequelize.transaction(async (transaction) => {
         const auction = await Auction.findByPk(auctionId, { transaction, lock: transaction.LOCK.UPDATE });
         if (!auction) throw notFound();
 
@@ -79,8 +84,13 @@ function createBidService({ Auction, Bid, sequelize }) {
           endsAt,
           version: auction.version + 1,
         }, { transaction });
-        return { bid: serializeBid(bid), replayed: false };
+        const updatedAuction = User
+          ? await Auction.findByPk(auctionId, { transaction, include: auctionIncludes })
+          : auction;
+        return { bid: serializeBid(bid), replayed: false, auction: updatedAuction };
       });
+      if (!result.replayed) eventPublisher?.publish('bid:updated', result.auction, { bid: result.bid });
+      return result;
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
       const existing = await findExisting(userId, input.clientRequestId);

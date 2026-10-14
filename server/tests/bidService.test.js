@@ -1,6 +1,6 @@
 const { createBidService } = require('../src/services/bidService');
 
-function setup(overrides = {}) {
+function setup(overrides = {}, eventPublisher, failCommit = false) {
   const auction = {
     id: 8,
     sellerId: 2,
@@ -33,8 +33,8 @@ function setup(overrides = {}) {
       return bid;
     },
   };
-  const sequelize = { async transaction(callback) { return callback(transaction); } };
-  return { service: createBidService({ Auction, Bid, sequelize }), auction, bids };
+  const sequelize = { async transaction(callback) { const result = await callback(transaction); if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
+  return { service: createBidService({ Auction, Bid, sequelize, eventPublisher }), auction, bids };
 }
 
 const input = { amount: 1_000, clientRequestId: '550e8400-e29b-41d4-a716-446655440000' };
@@ -55,6 +55,24 @@ describe('bid service state rules', () => {
     bids.push(existing);
     await expect(service.place(4, auction.id, input)).resolves.toMatchObject({ replayed: true, bid: { id: existing.id } });
     expect(bids).toHaveLength(1);
+  });
+
+  test('publishes accepted bids after commit, and never publishes a rejected bid', async () => {
+    const publisher = { committed: false, publish: jest.fn(function publish() { expect(this.committed).toBe(true); }) };
+    const { service, auction } = setup({}, publisher);
+    await service.place(4, auction.id, input);
+    expect(publisher.publish).toHaveBeenCalledWith('bid:updated', auction, { bid: expect.objectContaining({ amount: input.amount }) });
+
+    publisher.publish.mockClear();
+    await expect(setup({ status: 'draft' }, publisher).service.place(4, 8, input)).rejects.toMatchObject({ code: 'AUCTION_NOT_LIVE' });
+    expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  test('does not publish when the transaction fails to commit', async () => {
+    const publisher = { publish: jest.fn() };
+    const state = setup({}, publisher, true);
+    await expect(state.service.place(4, 8, input)).rejects.toThrow('commit failed');
+    expect(publisher.publish).not.toHaveBeenCalled();
   });
 
   test('rejects idempotency conflicts, missing/live/deadline/self-bid, minimum and price-limit violations', async () => {

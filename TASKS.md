@@ -86,12 +86,12 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 6 — Socket.IO
 
-- [ ] Buat Socket.IO server pada HTTP server.
-- [ ] Verifikasi JWT melalui handshake.
-- [ ] Implementasikan `auction:join` dan `auction:leave` beserta acknowledgment.
-- [ ] Kirim snapshot saat join.
-- [ ] Broadcast `auction:started`, `bid:updated`, dan `auction:ended` setelah commit.
-- [ ] Pastikan event memuat `auctionId`, `version`, `serverNow`, dan data relevan.
+- [x] Buat Socket.IO server pada HTTP server.
+- [x] Verifikasi JWT melalui handshake.
+- [x] Implementasikan `auction:join` dan `auction:leave` beserta acknowledgment.
+- [x] Kirim snapshot saat join.
+- [x] Broadcast `auction:started`, `bid:updated`, dan `auction:ended` setelah commit.
+- [x] Pastikan event memuat `auctionId`, `version`, `serverNow`, dan data relevan.
 - [ ] Buat `src/lib/socket.js` service yang mengelola satu instance Socket.IO; jangan simpan instance socket di Redux.
 - [ ] Implementasikan join/leave, listener cleanup, reconnect, resync dan status koneksi.
 - [ ] Dispatch event socket ke Redux melalui action pada `auctionSlice` dan `socketSlice`.
