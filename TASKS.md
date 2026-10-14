@@ -61,11 +61,11 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 4 — Bidding aman dan idempotency
 
-- [ ] Implementasikan satu `bidService` sebagai sumber aturan bid.
-- [ ] Gunakan transaksi dan row lock pada Auction.
-- [ ] Validasi status, deadline, self-bid, nominal, increment, dan batas nominal.
+- [x] Implementasikan satu `bidService` sebagai sumber aturan bid.
+- [x] Gunakan transaksi dan row lock pada Auction.
+- [x] Validasi status, deadline, self-bid, nominal, increment, dan batas nominal.
 - [ ] Implementasikan idempotency melalui `clientRequestId`.
-- [ ] Update Bid, `currentPrice`, `highestBidderId`, `endsAt`, dan `version` dalam transaksi yang konsisten.
+- [x] Update Bid, `currentPrice`, `highestBidderId`, `endsAt`, dan `version` dalam transaksi yang konsisten.
 - [ ] Broadcast tidak boleh terjadi sebelum commit.
 - [ ] Buat integration tests untuk bid minimum, request replay, payload conflict, dan bid simultan.
 
