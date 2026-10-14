@@ -159,6 +159,19 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 **Checkpoint:** alur end-to-end seller → buyer → AI → bid → auction ended berjalan dari UI.
 
+## FE-10 — Persiapan integrasi akhir (lokal; belum deploy)
+
+- [x] Jalankan regression suite FE-01–FE-09, production build, SPA suite, dan build preview lokal menggunakan mock REST/Socket.IO.
+- [x] Verifikasi dua client HTTP/Socket.IO, bid idempotency/lost response, countdown, closure, dan AI melalui integration suite.
+- [x] Tambahkan lazy loading per halaman dan lazy image decoding untuk mengurangi JavaScript awal.
+- [x] Tambahkan konfigurasi URL production saat build, pemeriksaan HTTPS/WSS, dan pemeriksaan asset/secret pada bundle.
+- [x] Tambahkan SPA fallback untuk static hosting, Dockerfile frontend-only, Nginx statis, serta contoh REST/Socket.IO reverse proxy.
+- [ ] Jalankan browser automation dua profil dan lima viewport; browser tooling yang tersedia pada sesi ini tidak menyediakan kontrol viewport/network yang dapat diverifikasi.
+- [ ] Integrasikan dan uji terhadap backend produksi, TLS/CORS, persistence, migrations, serta AI provider sebenarnya.
+- [ ] Deploy setelah persetujuan dan konfigurasi target tersedia (di luar scope FE-10 ini).
+
+**Checkpoint lokal:** lulus untuk mock-backed frontend build dan integration tests. Deployment readiness produksi masih menunggu layanan backend dan verifikasi browser/hosting yang belum tersedia.
+
 ## Phase 10 — Verifikasi akhir dan deployment
 
 - [ ] Jalankan test suite dan catat hasilnya.

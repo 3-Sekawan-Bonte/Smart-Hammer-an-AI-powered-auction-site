@@ -9,7 +9,7 @@ export default function AuctionCard({ auction }) {
     <article className="auction-card">
       <div className="card-visual">
         <div className="product-shot" style={{ backgroundPosition: auction.visualPosition }} aria-hidden="true" />
-        <img className="card-product-img" src={auction.imageUrl || '/assets/product-image-fallback.svg'} alt={auction.title} onError={(event) => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = 'true'; event.currentTarget.src = '/assets/product-image-fallback.svg'; } else event.currentTarget.hidden = true; }} />
+        <img className="card-product-img" loading="lazy" decoding="async" src={auction.imageUrl || '/assets/product-image-fallback.svg'} alt={auction.title} onError={(event) => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = 'true'; event.currentTarget.src = '/assets/product-image-fallback.svg'; } else event.currentTarget.hidden = true; }} />
         <span className={`badge ${auction.status === 'live' ? 'badge-live' : auction.status === 'ended' ? 'badge-ended' : 'badge-draft'}`}>{auction.status === 'ended' ? 'Berakhir' : auction.status === 'draft' ? 'Draft' : 'Live'}</span>
         <span className="lot-number">LOT {String(auction.id).padStart(3, '0')}</span>
       </div>

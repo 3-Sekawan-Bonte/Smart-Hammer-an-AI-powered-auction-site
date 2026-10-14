@@ -1,16 +1,19 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import GuestRoute from './components/GuestRoute';
-import AuctionDetailPage from './pages/AuctionDetailPage';
-import AuctionListPage from './pages/AuctionListPage';
-import AuthPage from './pages/AuthPage';
-import CreateAuctionPage from './pages/CreateAuctionPage';
-import NotFoundPage from './pages/NotFoundPage';
-import MyAuctionsPage from './pages/MyAuctionsPage';
+
+const AuctionDetailPage = lazy(() => import('./pages/AuctionDetailPage'));
+const AuctionListPage = lazy(() => import('./pages/AuctionListPage'));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const CreateAuctionPage = lazy(() => import('./pages/CreateAuctionPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const MyAuctionsPage = lazy(() => import('./pages/MyAuctionsPage'));
 
 export default function App() {
   return (
+    <Suspense fallback={<div className="page container"><div className="loading-card" role="status">Memuat halaman…</div></div>}>
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<ProtectedRoute><AuctionListPage /></ProtectedRoute>} />
@@ -23,5 +26,6 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
