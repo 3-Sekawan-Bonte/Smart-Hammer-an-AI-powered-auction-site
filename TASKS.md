@@ -21,63 +21,61 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Buat `.env.example` dan `.gitignore`.
 - [ ] Konfigurasikan PostgreSQL dan Sequelize.
 - [ ] Tambahkan penanganan error standar.
-- [ ] Pastikan satu panggilan nyata ke provider Generative AI dapat dilakukan dari backend.
+- [ ] Pastikan satu panggilan nyata ke OpenAI API (`gpt-4o-mini`) dapat dilakukan dari backend.
 
 **Checkpoint:** frontend dan backend dapat dijalankan; backend dapat terhubung ke database; credential tidak berada di frontend.
 
 ## Phase 1 — Database
 
-- [ ] Buat model dan migration `User`.
+- [x] Buat model dan migration `User`.
 - [ ] Buat model dan migration `Auction`.
 - [ ] Buat model dan migration `Bid` dengan unique `(userId, clientRequestId)`.
 - [ ] Buat model dan migration `AIInteraction`, termasuk `visibility`, `missingInformation`, `sourceVersion`, `snapshotAt`, dan `errorCode` sesuai kontrak.
 - [ ] Definisikan relasi Sequelize dan alias `seller`, `highestBidder`, `winner`, `bidder`, `auction`, serta AI interactions.
 - [ ] Tambahkan constraint/index yang diperlukan.
-- [ ] Siapkan seed akun demo dan beberapa draft produk dengan fakta yang jelas.
-- [ ] Verifikasi migration dan seed dapat dijalankan melalui workflow project.
+- [x] Siapkan seed akun demo dan beberapa draft produk dengan fakta yang jelas.
+- [x] Verifikasi migration dan seed dapat dijalankan melalui workflow project.
 
 **Checkpoint:** model, relasi, migration, dan seed dapat digunakan oleh service.
 
 ## Phase 2 — Authentication
 
-**Development-only auth simulator:** FE-02 can use the contract mock documented in `BE03_MOCK_IMPLEMENTATION.md`. Production BE-03 remains unchecked below.
-
-- [ ] `POST /users/register` dengan validasi dan hash bcrypt.
-- [ ] `POST /users/login` dengan JWT.
-- [ ] `GET /users/me` untuk pemulihan sesi.
-- [ ] Middleware JWT untuk route terlindungi.
-- [ ] Pastikan respons tidak mengandung password/hash.
-- [ ] Tambahkan tests register, login, token invalid, dan email duplikat.
+- [x] `POST /users/register` dengan validasi dan hash bcryptjs.
+- [x] `POST /users/login` dengan JWT.
+- [x] Verifikasi password login menggunakan bcryptjs dan normalisasi email ke lowercase.
+- [x] `GET /users/me` untuk pemulihan sesi.
+- [x] Middleware JWT untuk route terlindungi; identitas diambil dari subject JWT terverifikasi.
+- [x] Validasi input autentikasi, tolak field yang tidak dikenal, dan gunakan format error standar.
+- [x] Pastikan respons tidak mengandung password/hash.
+- [x] Jalankan dan verifikasi automated tests register, login, input invalid, password salah, token hilang/invalid, `GET /users/me`, password hash tidak terekspos, dan email duplikat.
 
 **Checkpoint:** register/login/restore-session berfungsi dan error mengikuti kontrak.
 
 ## Phase 3 — Auction API dan lifecycle
 
-**Catatan:** implementasi endpoint development mock untuk `GET/POST /auctions`, `GET/PATCH /auctions/:id`, dan `POST /auctions/:id/start` tersedia untuk FE-03. Checklist ini tetap melacak backend produksi (database, middleware, transaksi, dan integrasi); mock tersebut tidak menyelesaikan phase ini.
-
-- [ ] Buat `POST /auctions` untuk draft.
-- [ ] Buat `GET /auctions` dengan pagination.
-- [ ] Buat `GET /auctions/:id` untuk snapshot.
-- [ ] Buat `PATCH /auctions/:id` untuk edit draft oleh pemilik.
-- [ ] Buat `POST /auctions/:id/start`.
-- [ ] Terapkan validasi field, harga integer, durasi, category tetap `electronics`, dan URL gambar HTTPS.
-- [ ] Pastikan draft tidak dapat diakses user lain.
-- [ ] Gunakan serializer konsisten untuk objek Auction di REST dan Socket.IO.
-- [ ] Tambahkan tests permission dan lifecycle.
+- [x] Buat `POST /auctions` untuk draft.
+- [x] Buat `GET /auctions` dengan pagination.
+- [x] Buat `GET /auctions/:id` untuk snapshot.
+- [x] Buat `PATCH /auctions/:id` untuk edit draft oleh pemilik.
+- [x] Buat `POST /auctions/:id/start`.
+- [x] Terapkan validasi field, harga integer, durasi, category dari daftar subkategori (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`), dan URL gambar HTTPS.
+- [x] Pastikan draft tidak dapat diakses user lain.
+- [x] Implementasikan `DELETE /auctions/:id` untuk menghapus draft milik sendiri.
+- [x] Implementasikan query params `status`, `category`, `seller=me`, dan `search` pada `GET /auctions`.
+- [x] Gunakan serializer konsisten untuk objek Auction di REST dan Socket.IO.
+- [x] Tambahkan tests permission dan lifecycle.
 
 **Checkpoint:** seller dapat membuat draft, melihatnya, mengeditnya, dan memulai lelang.
 
 ## Phase 4 — Bidding aman dan idempotency
 
-**Development mock FE-06:** endpoint `POST/GET /auctions/:id/bids`, serialized single-process mutations, user-scoped idempotency, validation, event broadcast, and sliding deadline are implemented and tested. The production database-backed service below remains incomplete.
-
-- [ ] Implementasikan satu `bidService` sebagai sumber aturan bid.
-- [ ] Gunakan transaksi dan row lock pada Auction.
-- [ ] Validasi status, deadline, self-bid, nominal, increment, dan batas nominal.
+- [x] Implementasikan satu `bidService` sebagai sumber aturan bid.
+- [x] Gunakan transaksi dan row lock pada Auction.
+- [x] Validasi status, deadline, self-bid, nominal, increment, dan batas nominal.
 - [ ] Implementasikan idempotency melalui `clientRequestId`.
-- [ ] Update Bid, `currentPrice`, `highestBidderId`, `endsAt`, dan `version` dalam transaksi yang konsisten.
+- [x] Update Bid, `currentPrice`, `highestBidderId`, `endsAt`, dan `version` dalam transaksi yang konsisten.
 - [ ] Broadcast tidak boleh terjadi sebelum commit.
-- [ ] Buat integration tests untuk bid minimum, request replay, payload conflict, dan bid simultan.
+- [x] Buat integration tests untuk bid minimum, request replay, payload conflict, dan bid simultan.
 
 **Checkpoint:** concurrent/retry bids tidak membuat duplikasi atau harga/state inkonsisten.
 
@@ -92,59 +90,63 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Development mock: bid tepat pada/setelah deadline ditolak dan state ditutup.
 - [x] Frontend: countdown memakai `endsAt` terbaru dan koreksi `serverNow`, tanpa menentukan status akhir.
 - [x] Tes mock: closure berulang, sliding deadline, restart recovery, dan race bid/closure.
-- [ ] Production BE-06: scheduler, recovery, transaksi dan row lock database masih belum tersedia/terverifikasi.
+- [ ] Implementasikan service penutupan yang memakai lock Auction yang sama dengan bid.
+- [x] Tambahkan pemeriksaan deadline berkala.
+- [x] Tambahkan startup recovery untuk auction live yang sudah expired.
+- [x] Tentukan winner/finalPrice secara idempotent.
+- [x] Tangani lelang berakhir tanpa bid.
+- [x] Pastikan bid tepat pada/setelah deadline ditolak.
+- [x] Uji penutupan berulang, sliding deadline, dan restart recovery.
 
 **Checkpoint:** waktu dan hasil lelang diputuskan backend, termasuk jika scheduler terlambat atau server restart.
 
 ## Phase 6 — Socket.IO
 
-- [x] Buat development Socket.IO server nyata pada HTTP mock server yang sama (produksi masih belum tersedia).
-- [ ] Verifikasi JWT melalui handshake.
-- [ ] Implementasikan `auction:join` dan `auction:leave` beserta acknowledgment.
-- [ ] Kirim snapshot saat join.
-- [ ] Broadcast `auction:started`, `bid:updated`, dan `auction:ended` setelah commit.
-- [ ] Pastikan event memuat `auctionId`, `version`, `serverNow`, dan data relevan.
+- [x] Buat Socket.IO server pada HTTP server.
+- [x] Verifikasi JWT melalui handshake.
+- [x] Implementasikan `auction:join` dan `auction:leave` beserta acknowledgment.
+- [x] Kirim snapshot saat join.
+- [x] Broadcast `auction:started`, `bid:updated`, dan `auction:ended` setelah commit.
+- [x] Pastikan event memuat `auctionId`, `version`, `serverNow`, dan data relevan.
 - [ ] Buat `src/lib/socket.js` service yang mengelola satu instance Socket.IO; jangan simpan instance socket di Redux.
 - [ ] Implementasikan join/leave, listener cleanup, reconnect, resync dan status koneksi.
 - [ ] Dispatch event socket ke Redux melalui action pada `auctionSlice` dan `socketSlice`.
-- [ ] Integrasikan listener lifecycle Socket.IO dengan `processAuctionEvent`, recovery/reconnect, dan cleanup; reducer event FE-04 sudah tersedia.
-- [x] Verifikasi dua klien Socket.IO menerima broadcast yang sama, room lain tidak menerima event, dan Redux menerapkan event secara idempotent.
-- [x] Uji reconnect setelah server restart, pergantian room cepat, serta pergantian token akun pada tes integrasi multi-klien.
-
-**Batas FE-05:** checklist client lifecycle dan development mock di atas telah diimplementasikan. JWT produksi, broadcast setelah transaksi database, dua browser pada deployment, serta integrasi CORS/hosting masih memerlukan backend produksi dan tetap menjadi pekerjaan backend/integrasi deployment.
+- [ ] Deduplicate event dan abaikan versi state yang lebih lama.
+- [ ] Uji dua browser dan perpindahan antar-room.
 
 **Checkpoint:** dua browser melihat harga, riwayat, deadline, dan status yang sama tanpa refresh.
 
-## Phase 7 — AI Product Q&A (FE-08 development mock)
+## Phase 7 — AI Product Q&A
 
-- [x] Buat provider abstraction untuk mock deterministik dan OpenAI-compatible backend.
+- [x] Buat service provider AI backend.
 - [x] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
 - [x] Simpan interaction `pending` sebelum proses AI.
-- [x] Ambil product facts dan auction snapshot authoritative dari server.
+- [x] Ambil product facts dan auction snapshot dari server.
 - [x] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
 - [x] Simpan hasil `completed`/`failed` serta snapshot metadata.
-- [x] Gunakan `GET /auctions/:id/ai/interactions` untuk history dan recovery.
-- [x] Broadcast `ai:pending`, `ai:message`, atau `ai:error` ke room yang tepat.
-- [x] Bangun AIPanel frontend dengan status pending/completed/failed dan metadata snapshot.
-- [x] Uji fakta yang tidak tersedia, output berbahaya, timeout/provider failure, dua klien socket, dan rate limit.
+- [x] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
+- [x] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
+- [ ] Bangun AIPanel frontend dengan status pending/completed/failed.
+- [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
 
 **Checkpoint:** Q&A nyata berhasil, berbasis konteks server, tersimpan, dan kegagalannya tidak menghentikan bidding.
 
-## Phase 8 — AI Auctioneer (development mock)
+## Phase 8 — AI Auctioneer
 
-- [x] Tambahkan komentar mock saat auction mulai.
-- [x] Tambahkan trigger milestone bid setiap 5 bid dengan cooldown 25 detik.
+- [x] Tambahkan komentar saat auction mulai.
+- [x] Tambahkan trigger milestone bid pada setiap bid ke-3 dan batasi commentary yang berjalan bersamaan per room/global.
 - [x] Tambahkan komentar saat auction berakhir.
-- [x] Backend menghitung metrik dari state server; komentar tidak mengubah aturan lelang.
-- [x] Batasi satu komentar aktif per room dan labeli mock dengan metadata snapshot.
-- [x] Pastikan proses komentar terpisah dari jalur transaksi bid/closure.
+- [x] Backend menghitung metrik; AI hanya menyusun komentar.
+- [x] Batasi satu komentar AI berjalan per room dan tandai snapshot sumber melalui metadata version.
+- [x] Pastikan proses AI tidak menahan transaksi bid atau closure.
 - [x] Tampilkan komentar sebagai interaksi AI publik.
+- [x] Tambahkan tests untuk trigger start, milestone 3/6, closure, retry/rollback, provider failure, deduplikasi, dan event payload.
 
-**Checkpoint:** komentar mock muncul untuk event penting tanpa mengontrol aturan atau menunda bidding. Real provider masih perlu diuji dengan credential backend yang dikonfigurasi.
+**Checkpoint:** komentar AI muncul untuk event penting tanpa mengontrol aturan atau menunda bidding.
 
 ## Phase 9 — Integrasi dan penyelesaian frontend
 
-- [ ] Bangun halaman login/register, daftar lelang, create auction, dan detail lelang.
+- [ ] Bangun halaman login/register, daftar lelang (dengan search dan filter category/status), create auction, detail lelang, dan `/my-auctions`.
 - [ ] Implementasikan `authSlice`, `auctionSlice`, dan `socketSlice` sesuai arsitektur.
 - [ ] Gunakan `createAsyncThunk` untuk request REST asynchronous yang sesuai.
 - [ ] Gunakan selectors dan reducer idempotent untuk menggabungkan snapshot, response REST, serta event socket.
@@ -174,7 +176,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 10 — Verifikasi akhir dan deployment
 
-- [ ] Jalankan test suite dan catat hasilnya.
+- [x] Jalankan test suite dan catat hasilnya.
 - [ ] Uji alur dengan dua sesi/browser terpisah.
 - [ ] Uji concurrency, idempotency, deadline, reconnect, dan AI failure.
 - [ ] Verifikasi CORS, `CLIENT_ORIGIN`, URL API, dan koneksi Socket.IO pada hosting.
@@ -183,6 +185,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Pastikan tidak ada `.env`, token, atau API key dalam repository/build frontend.
 - [ ] Siapkan akun demo dan data lelang yang dapat diulang.
 - [ ] Siapkan demo lokal sebagai cadangan jika deployment gagal.
+- [ ] Deploy frontend ke Vercel dan backend ke Railway.
 
 **Checkpoint:** satu skenario end-to-end dapat diulang tanpa mengedit data database secara manual.
 
