@@ -4,9 +4,17 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 0 — Kunci scope dan fondasi
 
+- [x] FE-01 Frontend Foundation: autentikasi Redux, proteksi route, marketplace awal, dan kontrak mock API. Seller draft lifecycle, pagination, dan auction detail diselesaikan pada FE-03.
+- [x] FE-02 Authentication: register/login, pemulihan sesi, proteksi route, logout pada mobile, error terstruktur, dan tes terverifikasi pada mock. Baca `FE02_CHANGELOG.md` dan `FE02_IMPLEMENTATION_REPORT.md`; BE-03 produksi tetap belum selesai.
+- [x] FE-03 Auction UI: listing/pagination, create draft, owner-only edit draft, detail, start dengan konfirmasi, mock API lifecycle, dan validasi FE-03 terverifikasi. Lihat `FE03_IMPLEMENTATION_REPORT.md`.
+- [x] FE-04 Auction Room State Management: snapshot Redux tervalidasi, merge bid/AI deduplicated, version guard, resync state, room isolation, selectors/hooks, dan reducer tests terverifikasi. Lihat `FE04_CHANGELOG.md`.
+- [x] FE-06 Live Bidding UI + functional development mock: BidForm, BidHistory, REST submission, UUID idempotency, server-side validation, serialized local mock writes, sliding deadline, and real Socket.IO broadcasts verified. Lihat `FE06_CHANGELOG.md`; BE-05 production transaction/locking remains incomplete.
+- [x] FE-07 Countdown and Auction Results: server-time-aware local countdown, zero-time confirmation/resync, authoritative winner/no-bid banner, persistent mock closure scheduler, startup/read-time recovery, serialized bid/closure, and `auction:ended` broadcast verified. Lihat `FE07_CHANGELOG.md`; BE-06 production scheduler/transaction/locking remains incomplete.
+- [x] FE-09 Recovery and Stability: bounded GET retries, temporary auth outage preservation, connectivity banner, retryable snapshot resync, React error boundary, and loopback fault tests including lost bid response replay. See `FE09_CHANGELOG.md`; production backend recovery guarantees remain dependent on BE-03/05/06.
+- [x] SPA navigation audit: internal routes use React Router, one persistent router/store/provider tree, React-handled forms, and route-driven Socket.IO room membership; nested URLs refresh through Vite fallback. Static regression checks and browser route checks documented in `SPA_NAVIGATION_FIX_CHANGELOG.md`.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
-- [ ] Siapkan frontend React + Vite + Tailwind CSS v4.
+- [ ] Siapkan frontend React + Vite + Tailwind CSS.
 - [ ] Install `@reduxjs/toolkit` dan `react-redux`.
 - [ ] Buat `configureStore` dan bungkus root React dengan Redux `<Provider>`.
 - [ ] Siapkan backend Express dan HTTP server.
@@ -73,13 +81,21 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 5 — Penutupan dan countdown
 
+**Development mock FE-07:** countdown memakai server clock offset dan `endsAt`; mock menutup lelang berkala, pada startup, saat snapshot dibaca, dan ketika bid tiba setelah deadline. Closure idempotent, memakai antrean serial yang sama dengan bid, menyimpan winner/no-bid result ke file JSON persisten, lalu menyiarkan `auction:ended`. Integration tests mencakup scheduler, recovery, read-time closure, sliding deadline, dan race bid/closure. Lihat `FE07_CHANGELOG.md`.
+
+- [x] Development mock: service penutupan memakai antrean serial yang sama dengan bid.
+- [x] Development mock: pemeriksaan deadline berkala dan graceful timer cleanup.
+- [x] Development mock: startup recovery dari file state JSON persisten.
+- [x] Development mock: winner/finalPrice serta hasil tanpa bid secara idempotent.
+- [x] Development mock: bid tepat pada/setelah deadline ditolak dan state ditutup.
+- [x] Frontend: countdown memakai `endsAt` terbaru dan koreksi `serverNow`, tanpa menentukan status akhir.
+- [x] Tes mock: closure berulang, sliding deadline, restart recovery, dan race bid/closure.
 - [ ] Implementasikan service penutupan yang memakai lock Auction yang sama dengan bid.
 - [x] Tambahkan pemeriksaan deadline berkala.
 - [x] Tambahkan startup recovery untuk auction live yang sudah expired.
 - [x] Tentukan winner/finalPrice secara idempotent.
 - [x] Tangani lelang berakhir tanpa bid.
 - [x] Pastikan bid tepat pada/setelah deadline ditolak.
-- [ ] Implementasikan countdown frontend dengan `endsAt` terbaru dan koreksi `serverNow`.
 - [x] Uji penutupan berulang, sliding deadline, dan restart recovery.
 
 **Checkpoint:** waktu dan hasil lelang diputuskan backend, termasuk jika scheduler terlambat atau server restart.
@@ -144,6 +160,19 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Buat README untuk install, env, migration, seed, run, test, dan demo.
 
 **Checkpoint:** alur end-to-end seller → buyer → AI → bid → auction ended berjalan dari UI.
+
+## FE-10 — Persiapan integrasi akhir (lokal; belum deploy)
+
+- [x] Jalankan regression suite FE-01–FE-09, production build, SPA suite, dan build preview lokal menggunakan mock REST/Socket.IO.
+- [x] Verifikasi dua client HTTP/Socket.IO, bid idempotency/lost response, countdown, closure, dan AI melalui integration suite.
+- [x] Tambahkan lazy loading per halaman dan lazy image decoding untuk mengurangi JavaScript awal.
+- [x] Tambahkan konfigurasi URL production saat build, pemeriksaan HTTPS/WSS, dan pemeriksaan asset/secret pada bundle.
+- [x] Tambahkan SPA fallback untuk static hosting, Dockerfile frontend-only, Nginx statis, serta contoh REST/Socket.IO reverse proxy.
+- [ ] Jalankan browser automation dua profil dan lima viewport; browser tooling yang tersedia pada sesi ini tidak menyediakan kontrol viewport/network yang dapat diverifikasi.
+- [ ] Integrasikan dan uji terhadap backend produksi, TLS/CORS, persistence, migrations, serta AI provider sebenarnya.
+- [ ] Deploy setelah persetujuan dan konfigurasi target tersedia (di luar scope FE-10 ini).
+
+**Checkpoint lokal:** lulus untuk mock-backed frontend build dan integration tests. Deployment readiness produksi masih menunggu layanan backend dan verifikasi browser/hosting yang belum tersedia.
 
 ## Phase 10 — Verifikasi akhir dan deployment
 

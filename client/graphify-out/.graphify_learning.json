@@ -1,0 +1,506 @@
+{
+  "generated_at": "2026-10-14T04:03:47.236272+00:00",
+  "nodes": {
+    "agents_graphify_workflow": {
+      "code_fingerprint": "6304e010c25f7d60da10ba3402d46b3ca14b680b98716af444ba3d7119c448dd",
+      "label": "Graphify Workflow",
+      "last": "2026-10-13T06:42:05.615094+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:42:05.615094+00:00",
+          "outcome": "useful",
+          "q": "ini kalo saya ganti ai gitu nanti dia bisa saya langsung suruh pake graphify buat lihat semuanya kan/"
+        }
+      ],
+      "score": 0.979645145,
+      "source_file": "AGENTS.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_mock_start": {
+      "code_fingerprint": "c4da1262f2b65135bb7b6ed14ebdd73f1d068f3ece8720a6e1a781e70152240d",
+      "label": "start.mjs",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        },
+        {
+          "date": "2026-10-14T03:27:30.327871+00:00",
+          "outcome": "useful",
+          "q": "FE-01 frontend foundation review after fixes"
+        }
+      ],
+      "score": 1.998859529,
+      "source_file": "client/mock/start.mjs",
+      "status": "preferred",
+      "uses": 2
+    },
+    "client_src_app": {
+      "code_fingerprint": "088cffa5f527cfbaa060594777752e2f4c838b0bcbbce4d0690d48ec536eb2dd",
+      "label": "App.jsx",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        },
+        {
+          "date": "2026-10-14T03:27:30.327871+00:00",
+          "outcome": "useful",
+          "q": "FE-01 frontend foundation review after fixes"
+        }
+      ],
+      "score": 1.998859529,
+      "source_file": "client/src/App.jsx",
+      "status": "preferred",
+      "uses": 2
+    },
+    "client_src_components_auctioncard_auctioncard": {
+      "code_fingerprint": "72a9280eb2ff0b76899e446ebbc6e35931998af46e22efce3ccf693089a64bfc",
+      "label": "AuctionCard()",
+      "last": "2026-10-13T06:30:16.965144+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:30:16.965144+00:00",
+          "outcome": "useful",
+          "q": "oke langsung lanjut aja"
+        },
+        {
+          "date": "2026-10-13T06:23:22.638452+00:00",
+          "outcome": "useful",
+          "q": "UInya kurang modern sih coba anda cari lagi yang lebih modern"
+        }
+      ],
+      "score": 1.958810513,
+      "source_file": "client/src/components/AuctionCard.jsx",
+      "status": "preferred",
+      "uses": 2
+    },
+    "client_src_components_countdown_countdown": {
+      "code_fingerprint": "786b70725469d9afd01a8fb76d9fbb4f6952eecf757ecb8af0017b276b4a70be",
+      "label": "Countdown()",
+      "last": "2026-10-13T06:40:37.521894+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:40:37.521894+00:00",
+          "outcome": "useful",
+          "q": "masih sebanyak apa lgi fiurnya?"
+        }
+      ],
+      "score": 0.979622067,
+      "source_file": "client/src/components/Countdown.jsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_components_layout_layout": {
+      "code_fingerprint": "af638db4a123056e2d5c6c97df49c7fc5ec38b23440fa8a7d260d81a1aa33fc7",
+      "label": "Layout()",
+      "last": "2026-10-13T06:23:22.638452+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:23:22.638452+00:00",
+          "outcome": "useful",
+          "q": "UInya kurang modern sih coba anda cari lagi yang lebih modern"
+        }
+      ],
+      "score": 0.979350998,
+      "source_file": "client/src/components/Layout.jsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_contexts_authcontext": {
+      "code_fingerprint": "d3e80385d2711a8ec2c8285548d94d898fdf135d0bd8dc80783ad1f8f5311dc9",
+      "label": "AuthContext.jsx",
+      "last": "2026-10-13T05:39:51.138206+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T05:39:51.138206+00:00",
+          "outcome": "useful",
+          "q": "jangan yang ke backend dulu dan ini backendnya pake json.server dulu aja"
+        }
+      ],
+      "score": 0.978667295,
+      "source_file": "client/src/contexts/AuthContext.jsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_contexts_socketcontext": {
+      "code_fingerprint": "4bf11dd20d4bba3b2c27466b0192a7b50550d484e2681fb062d6d45645300877",
+      "label": "SocketContext.jsx",
+      "last": "2026-10-13T06:40:37.521894+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:40:37.521894+00:00",
+          "outcome": "useful",
+          "q": "masih sebanyak apa lgi fiurnya?"
+        }
+      ],
+      "score": 0.979622067,
+      "source_file": "client/src/contexts/SocketContext.jsx",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_features_auctions_auctionslice": {
+      "code_fingerprint": "dd69c379cd3f19d4e4e69b04e7e611a0a29a545114b477f54dc38da0a48daa15",
+      "label": "auctionSlice.js",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        },
+        {
+          "date": "2026-10-14T03:27:30.327871+00:00",
+          "outcome": "useful",
+          "q": "FE-01 frontend foundation review after fixes"
+        }
+      ],
+      "score": 1.998859529,
+      "source_file": "client/src/features/auctions/auctionSlice.js",
+      "status": "preferred",
+      "uses": 2
+    },
+    "client_src_features_auctions_auctionslice_auctionslice": {
+      "code_fingerprint": "dd69c379cd3f19d4e4e69b04e7e611a0a29a545114b477f54dc38da0a48daa15",
+      "label": "auctionSlice",
+      "last": "2026-10-14T04:03:44.818763+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T04:03:44.818763+00:00",
+          "outcome": "useful",
+          "q": "Which FE-01 UI regressions were found and fixed?"
+        }
+      ],
+      "score": 0.999999354,
+      "source_file": "client/src/features/auctions/auctionSlice.js",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_features_auth_authslice_authslice": {
+      "code_fingerprint": "cb519f4ba59d45dbe33343af1c9ae2af24cc3a0c262455a525a8b2b7ae06903c",
+      "label": "authSlice",
+      "last": "2026-10-14T04:03:44.818763+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T04:03:44.818763+00:00",
+          "outcome": "useful",
+          "q": "Which FE-01 UI regressions were found and fixed?"
+        }
+      ],
+      "score": 0.999999354,
+      "source_file": "client/src/features/auth/authSlice.js",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_lib_api": {
+      "code_fingerprint": "00593a32015e5832bcb3b0b315126fb93dfbe03007e9aaeda0160d6ff6edbd41",
+      "label": "api.js",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        },
+        {
+          "date": "2026-10-14T03:27:30.327871+00:00",
+          "outcome": "useful",
+          "q": "FE-01 frontend foundation review after fixes"
+        }
+      ],
+      "score": 1.998859529,
+      "source_file": "client/src/lib/api.js",
+      "status": "preferred",
+      "uses": 2
+    },
+    "client_src_lib_api_api": {
+      "code_fingerprint": "00593a32015e5832bcb3b0b315126fb93dfbe03007e9aaeda0160d6ff6edbd41",
+      "label": "api",
+      "last": "2026-10-13T06:37:18.556665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:37:18.556665+00:00",
+          "outcome": "useful",
+          "q": "oke buat yang ini"
+        }
+      ],
+      "score": 0.979569946,
+      "source_file": "client/src/lib/api.js",
+      "status": "tentative",
+      "uses": 1
+    },
+    "client_src_pages_auctiondetailpage": {
+      "code_fingerprint": "fc97a1b78f44a862ecedfa251f6be2f7d1227fe4a13e970c491ffba85d610015",
+      "label": "AuctionDetailPage.jsx",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        },
+        {
+          "date": "2026-10-14T03:27:30.327871+00:00",
+          "outcome": "useful",
+          "q": "FE-01 frontend foundation review after fixes"
+        }
+      ],
+      "score": 1.998859529,
+      "source_file": "client/src/pages/AuctionDetailPage.jsx",
+      "status": "preferred",
+      "uses": 2
+    },
+    "client_src_pages_auctiondetailpage_auctiondetailpage": {
+      "code_fingerprint": "fc97a1b78f44a862ecedfa251f6be2f7d1227fe4a13e970c491ffba85d610015",
+      "label": "AuctionDetailPage()",
+      "last": "2026-10-13T06:40:37.521894+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:40:37.521894+00:00",
+          "outcome": "useful",
+          "q": "masih sebanyak apa lgi fiurnya?"
+        },
+        {
+          "date": "2026-10-13T06:33:10.240825+00:00",
+          "outcome": "useful",
+          "q": "terus selanjutnya buat apa?"
+        },
+        {
+          "date": "2026-10-13T06:30:16.965144+00:00",
+          "outcome": "useful",
+          "q": "oke langsung lanjut aja"
+        },
+        {
+          "date": "2026-10-13T06:23:22.638452+00:00",
+          "outcome": "useful",
+          "q": "UInya kurang modern sih coba anda cari lagi yang lebih modern"
+        }
+      ],
+      "score": 3.917937481,
+      "source_file": "client/src/pages/AuctionDetailPage.jsx",
+      "status": "preferred",
+      "uses": 4
+    },
+    "client_src_pages_auctionlistpage_auctionlistpage": {
+      "code_fingerprint": "7fc03f013869b3e0d9fdd30a5fe5f3bff4b01a0c205cff8ccd8b164c774364e8",
+      "label": "AuctionListPage()",
+      "last": "2026-10-13T06:37:18.556665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:37:18.556665+00:00",
+          "outcome": "useful",
+          "q": "oke buat yang ini"
+        },
+        {
+          "date": "2026-10-13T06:33:10.240825+00:00",
+          "outcome": "useful",
+          "q": "terus selanjutnya buat apa?"
+        },
+        {
+          "date": "2026-10-13T06:30:16.965144+00:00",
+          "outcome": "useful",
+          "q": "oke langsung lanjut aja"
+        },
+        {
+          "date": "2026-10-13T06:23:22.638452+00:00",
+          "outcome": "useful",
+          "q": "UInya kurang modern sih coba anda cari lagi yang lebih modern"
+        }
+      ],
+      "score": 3.91788536,
+      "source_file": "client/src/pages/AuctionListPage.jsx",
+      "status": "preferred",
+      "uses": 4
+    },
+    "client_src_pages_createauctionpage_createauctionpage": {
+      "code_fingerprint": "ee5ab543e563386b9ddd1d71f3b53f8381773ae2dcdb2650dd4b16eda7998549",
+      "label": "CreateAuctionPage()",
+      "last": "2026-10-13T06:37:18.556665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:37:18.556665+00:00",
+          "outcome": "useful",
+          "q": "oke buat yang ini"
+        },
+        {
+          "date": "2026-10-13T06:33:10.240825+00:00",
+          "outcome": "useful",
+          "q": "terus selanjutnya buat apa?"
+        }
+      ],
+      "score": 1.959074847,
+      "source_file": "client/src/pages/CreateAuctionPage.jsx",
+      "status": "preferred",
+      "uses": 2
+    },
+    "graphify_out_memory_query_20261013_050156_acb49a38_saya_bagian_buat_frotend_jadi_langkah_pertamanya_b_fe_01_foundation": {
+      "code_fingerprint": "f5f1fe747b3f1ba6610798e95953b7cd9af3fd026a95817c35b50d06968ccc3e",
+      "label": "FE-01 Frontend Foundation",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        },
+        {
+          "date": "2026-10-14T03:27:30.327871+00:00",
+          "outcome": "useful",
+          "q": "FE-01 frontend foundation review after fixes"
+        }
+      ],
+      "score": 1.998859529,
+      "source_file": "graphify-out/memory/query_20261013_050156_acb49a38_saya_bagian_buat_frotend_jadi_langkah_pertamanya_b.md",
+      "status": "preferred",
+      "uses": 2
+    },
+    "rencana_bidwar_ai_sampai_kamis_auction_context": {
+      "code_fingerprint": "d37ff87645dcfc91e0f01feb42214180639ecf7bf356aadbf64dfe522b14e936",
+      "label": "AuctionContext",
+      "last": "2026-10-13T06:33:10.240825+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:33:10.240825+00:00",
+          "outcome": "useful",
+          "q": "terus selanjutnya buat apa?"
+        },
+        {
+          "date": "2026-10-13T05:08:14.191367+00:00",
+          "outcome": "useful",
+          "q": "uinya menurut anda bagusnya gimana?"
+        }
+      ],
+      "score": 1.957675866,
+      "source_file": "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md",
+      "status": "preferred",
+      "uses": 2
+    },
+    "rencana_bidwar_ai_sampai_kamis_frontend_jobs": {
+      "code_fingerprint": "d37ff87645dcfc91e0f01feb42214180639ecf7bf356aadbf64dfe522b14e936",
+      "label": "Frontend Job Plan FE-01–FE-10",
+      "last": "2026-10-13T06:42:05.615094+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T06:42:05.615094+00:00",
+          "outcome": "useful",
+          "q": "ini kalo saya ganti ai gitu nanti dia bisa saya langsung suruh pake graphify buat lihat semuanya kan/"
+        },
+        {
+          "date": "2026-10-13T06:40:37.521894+00:00",
+          "outcome": "useful",
+          "q": "masih sebanyak apa lgi fiurnya?"
+        },
+        {
+          "date": "2026-10-13T06:33:10.240825+00:00",
+          "outcome": "useful",
+          "q": "terus selanjutnya buat apa?"
+        },
+        {
+          "date": "2026-10-13T05:39:51.138206+00:00",
+          "outcome": "useful",
+          "q": "jangan yang ke backend dulu dan ini backendnya pake json.server dulu aja"
+        },
+        {
+          "date": "2026-10-13T05:08:14.191367+00:00",
+          "outcome": "useful",
+          "q": "uinya menurut anda bagusnya gimana?"
+        }
+      ],
+      "score": 5.873682639,
+      "source_file": "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md",
+      "status": "preferred",
+      "uses": 6
+    },
+    "rencana_bidwar_ai_sampai_kamis_jwt_authentication": {
+      "code_fingerprint": "d37ff87645dcfc91e0f01feb42214180639ecf7bf356aadbf64dfe522b14e936",
+      "label": "JWT Authentication",
+      "last": "2026-10-13T05:01:56.850372+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T05:01:56.850372+00:00",
+          "outcome": "useful",
+          "q": "saya bagian buat frotend jadi langkah pertamanya buat apa dlu anda lihat file mdnya"
+        }
+      ],
+      "score": 0.978072265,
+      "source_file": "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "rencana_bidwar_ai_sampai_kamis_react_context_state_management": {
+      "code_fingerprint": "d37ff87645dcfc91e0f01feb42214180639ecf7bf356aadbf64dfe522b14e936",
+      "label": "React Context State Management",
+      "last": "2026-10-13T05:08:14.191367+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T05:08:14.191367+00:00",
+          "outcome": "useful",
+          "q": "uinya menurut anda bagusnya gimana?"
+        },
+        {
+          "date": "2026-10-13T05:01:56.850372+00:00",
+          "outcome": "useful",
+          "q": "saya bagian buat frotend jadi langkah pertamanya buat apa dlu anda lihat file mdnya"
+        }
+      ],
+      "score": 1.956243231,
+      "source_file": "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md",
+      "status": "preferred",
+      "uses": 2
+    },
+    "rencana_bidwar_ai_sampai_kamis_rest_api_v1": {
+      "code_fingerprint": "d37ff87645dcfc91e0f01feb42214180639ecf7bf356aadbf64dfe522b14e936",
+      "label": "REST API v1 Contract",
+      "last": "2026-10-13T05:01:56.850372+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T05:01:56.850372+00:00",
+          "outcome": "useful",
+          "q": "saya bagian buat frotend jadi langkah pertamanya buat apa dlu anda lihat file mdnya"
+        }
+      ],
+      "score": 0.978072265,
+      "source_file": "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "rencana_bidwar_ai_sampai_kamis_socket_io_realtime": {
+      "code_fingerprint": "d37ff87645dcfc91e0f01feb42214180639ecf7bf356aadbf64dfe522b14e936",
+      "label": "Socket.IO Real-Time Synchronization",
+      "last": "2026-10-13T05:08:14.191367+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-13T05:08:14.191367+00:00",
+          "outcome": "useful",
+          "q": "uinya menurut anda bagusnya gimana?"
+        }
+      ],
+      "score": 0.978170965,
+      "source_file": "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "tasks": {
+      "code_fingerprint": "1667447c09703f79d675189bd7bc1803e9cb26c005f83b5bde80d968c162fda5",
+      "label": "TASKS.md",
+      "last": "2026-10-14T03:28:58.175665+00:00",
+      "provenance": [
+        {
+          "date": "2026-10-14T03:28:58.175665+00:00",
+          "outcome": "useful",
+          "q": "FE-01 foundation fixes and verification"
+        }
+      ],
+      "score": 0.999441504,
+      "source_file": "TASKS.md",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
+  "version": 1
+}
