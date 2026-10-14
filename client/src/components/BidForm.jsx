@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { loadAuctionSnapshot, selectActiveId, selectSubmitStatus, submitBid } from '../features/auctions/auctionSlice.js';
 import { selectAuthRestoring } from '../features/auth/authSlice.js';
-import { formatRupiah, getBidAvailability, parseBidAmount } from '../features/auctions/bidUtils.js';
+import { formatRupiah, getBidAvailability, resolveBidSubmissionAmount } from '../features/auctions/bidUtils.js';
 import { clearPendingBidIntent, createBidIntent, getPendingBidIntent, savePendingBidIntent } from '../features/auctions/bidIntent.js';
 
 export default function BidForm({ auction, user, deadlinePending = false }) {
@@ -28,7 +28,15 @@ export default function BidForm({ auction, user, deadlinePending = false }) {
 
   async function sendIntent(nextIntent) {
     const retryingSameIntent = intent?.clientRequestId === nextIntent.clientRequestId && intent?.amount === nextIntent.amount;
-    if (inFlight.current || (!availability.allowed && !retryingSameIntent) || String(activeId) !== String(auction.id)) return;
+    const state = store.getState();
+    const latestAuction = state.auction.active.auction;
+    const latestUser = state.auth.user;
+    const latestAuthRestoring = ['checking', 'restoring'].includes(state.auth.status);
+    const latestAvailability = getBidAvailability({ auction: latestAuction, user: latestUser, authRestoring: latestAuthRestoring });
+    const sameAccount = String(latestUser?.id) === String(user?.id);
+    if (inFlight.current || !sameAccount || (!latestAvailability.allowed && !retryingSameIntent)
+      || String(state.auction.active.currentId) !== String(auction.id)
+      || String(latestAuction?.id) !== String(auction.id)) return;
     inFlight.current = true;
     setBusy(true);
     setFeedback(null);
@@ -73,15 +81,31 @@ export default function BidForm({ auction, user, deadlinePending = false }) {
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (inFlight.current) return;
     setFeedback(null);
     if (intent) return void sendIntent(intent);
-    const parsed = parseBidAmount(amountText);
-    if (parsed.error) { setValidationError(parsed.error); return; }
-    if (parsed.amount < auction.nextMinimumBid) {
-      setValidationError(`Nominal minimum saat ini ${formatRupiah(auction.nextMinimumBid)}.`);
+    const state = store.getState();
+    const latestAuction = state.auction.active.auction;
+    const latestUser = state.auth.user;
+    const latestAuthRestoring = ['checking', 'restoring'].includes(state.auth.status);
+    const latestAvailability = getBidAvailability({ auction: latestAuction, user: latestUser, authRestoring: latestAuthRestoring });
+    if (String(state.auction.active.currentId) !== String(auction.id) || String(latestAuction?.id) !== String(auction.id)) {
+      setFeedback({ type: 'warning', message: 'State lelang terbaru belum tersedia. Muat ulang lelang sebelum mengirim bid.' });
+      dispatch(loadAuctionSnapshot(String(auction.id)));
       return;
     }
-    const nextIntent = createBidIntent(parsed.amount);
+    if (!latestAvailability.allowed) {
+      setFeedback({ type: 'error', message: latestAvailability.reason || 'Bid tidak tersedia untuk state lelang saat ini.' });
+      if (latestAuction?.status !== 'live') dispatch(loadAuctionSnapshot(String(auction.id)));
+      return;
+    }
+    const resolved = resolveBidSubmissionAmount(amountText, latestAuction);
+    if (resolved.error) {
+      setValidationError(resolved.error);
+      if (!Number.isSafeInteger(latestAuction?.nextMinimumBid)) dispatch(loadAuctionSnapshot(String(auction.id)));
+      return;
+    }
+    const nextIntent = createBidIntent(resolved.amount);
     setIntent(nextIntent);
     savePendingBidIntent(auction.id, user.id, nextIntent);
     void sendIntent(nextIntent);

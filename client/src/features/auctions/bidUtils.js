@@ -10,6 +10,20 @@ export function parseBidAmount(value) {
   return { amount, error: null };
 }
 
+export function resolveBidSubmissionAmount(inputValue, auction) {
+  const minimum = auction?.nextMinimumBid;
+  if (!Number.isSafeInteger(minimum) || minimum < 1 || minimum > MAX_BID_AMOUNT) {
+    return { amount: null, error: 'Minimum bid terbaru belum tersedia. Muat ulang lelang sebelum mengirim bid.' };
+  }
+  const candidate = String(inputValue ?? '').trim() === '' ? minimum : inputValue;
+  const parsed = parseBidAmount(candidate);
+  if (parsed.error) return parsed;
+  if (parsed.amount < minimum) {
+    return { amount: null, error: `Nominal minimum saat ini ${formatRupiah(minimum)}.` };
+  }
+  return parsed;
+}
+
 export function formatRupiah(value) {
   if (value == null || value === '') return '—';
   if (!Number.isSafeInteger(Number(value))) return '—';

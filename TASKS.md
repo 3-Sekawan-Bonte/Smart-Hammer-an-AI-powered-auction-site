@@ -161,13 +161,15 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Pastikan logout menghapus state privat dan disconnect socket.
 - [x] Pastikan respons snapshot/event dari room lama tidak menimpa room aktif.
 - [x] Pastikan bid tidak menaikkan harga optimistis sebelum server menerima penawaran.
+- [x] Skala harga lelang terformat memakai lebar container, pertahankan seluruh digit hingga Rp2.000.000.000, dan jaga layout bid/minimum tetap muat.
+- [x] Tombol `Kirim bid` memakai `nextMinimumBid` dari snapshot Redux terbaru saat input kosong; nominal manual tetap dipertahankan, sedangkan request ID, guard eligibility, dan retry idempotent tetap digunakan.
 - [x] Tampilkan WinnerBanner hanya dari hasil lelang yang dikonfirmasi server.
 
 ### REST and backend contract integration
 - [x] Cocokkan register/login/session restore dengan `POST /users/register`, `POST /users/login`, dan `GET /users/me`; frontend menerima JWT `accessToken` backend.
 - [x] Integrasikan listing, pagination, pencarian, filter, detail, draft create/edit/delete, start, dan seller listing `seller=me`.
 - [x] Gunakan kategori backend yang diizinkan dan kirim field `category` dari form.
-- [x] Tawarkan pilihan durasi 1, 3, dan 7 hari; kirim integer detik dan pertahankan pilihan saat draft diedit.
+- [ ] Tawarkan pilihan durasi 1, 3, dan 7 hari; verifikasi melalui browser bahwa nilai detik terkirim dan pilihan draft tetap tampil.
 - [x] Cocokkan respons bid/idempotency, tampilkan minimum bid dari state backend, dan sediakan `GET /auctions/:id/bids` terpaginasikan tanpa membocorkan idempotency key.
 - [x] Cocokkan Product Q&A dan riwayat AI dengan API; Q&A privat per pemilik, sedangkan commentary Auctioneer tetap publik.
 - [x] Konfigurasikan URL API/Socket.IO frontend, CORS Express, dan CORS Socket.IO memakai origin yang dikonfigurasi.
