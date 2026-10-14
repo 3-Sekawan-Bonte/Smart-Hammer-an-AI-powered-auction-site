@@ -45,16 +45,16 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 3 — Auction API dan lifecycle
 
-- [ ] Buat `POST /auctions` untuk draft.
-- [ ] Buat `GET /auctions` dengan pagination.
-- [ ] Buat `GET /auctions/:id` untuk snapshot.
-- [ ] Buat `PATCH /auctions/:id` untuk edit draft oleh pemilik.
-- [ ] Buat `POST /auctions/:id/start`.
-- [ ] Terapkan validasi field, harga integer, durasi, category dari daftar subkategori (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`), dan URL gambar HTTPS.
-- [ ] Pastikan draft tidak dapat diakses user lain.
-- [ ] Implementasikan `DELETE /auctions/:id` untuk menghapus draft milik sendiri.
-- [ ] Implementasikan query params `status`, `category`, `seller=me`, dan `search` pada `GET /auctions`.
-- [ ] Gunakan serializer konsisten untuk objek Auction di REST dan Socket.IO.
+- [x] Buat `POST /auctions` untuk draft.
+- [x] Buat `GET /auctions` dengan pagination.
+- [x] Buat `GET /auctions/:id` untuk snapshot.
+- [x] Buat `PATCH /auctions/:id` untuk edit draft oleh pemilik.
+- [x] Buat `POST /auctions/:id/start`.
+- [x] Terapkan validasi field, harga integer, durasi, category dari daftar subkategori (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`), dan URL gambar HTTPS.
+- [x] Pastikan draft tidak dapat diakses user lain.
+- [x] Implementasikan `DELETE /auctions/:id` untuk menghapus draft milik sendiri.
+- [x] Implementasikan query params `status`, `category`, `seller=me`, dan `search` pada `GET /auctions`.
+- [x] Gunakan serializer konsisten untuk objek Auction di REST dan Socket.IO.
 - [ ] Tambahkan tests permission dan lifecycle.
 
 **Checkpoint:** seller dapat membuat draft, melihatnya, mengeditnya, dan memulai lelang.
