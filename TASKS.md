@@ -114,32 +114,32 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 **Checkpoint:** dua browser melihat harga, riwayat, deadline, dan status yang sama tanpa refresh.
 
-## Phase 7 — AI Product Q&A
+## Phase 7 — AI Product Q&A (FE-08 development mock)
 
-- [ ] Buat service provider AI backend.
-- [ ] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
-- [ ] Simpan interaction `pending` sebelum proses AI.
-- [ ] Ambil product facts dan auction snapshot dari server.
-- [ ] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
-- [ ] Simpan hasil `completed`/`failed` serta snapshot metadata.
-- [ ] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
-- [ ] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
-- [ ] Bangun AIPanel frontend dengan status pending/completed/failed.
-- [ ] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
+- [x] Buat provider abstraction untuk mock deterministik dan OpenAI-compatible backend.
+- [x] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
+- [x] Simpan interaction `pending` sebelum proses AI.
+- [x] Ambil product facts dan auction snapshot authoritative dari server.
+- [x] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
+- [x] Simpan hasil `completed`/`failed` serta snapshot metadata.
+- [x] Gunakan `GET /auctions/:id/ai/interactions` untuk history dan recovery.
+- [x] Broadcast `ai:pending`, `ai:message`, atau `ai:error` ke room yang tepat.
+- [x] Bangun AIPanel frontend dengan status pending/completed/failed dan metadata snapshot.
+- [x] Uji fakta yang tidak tersedia, output berbahaya, timeout/provider failure, dua klien socket, dan rate limit.
 
 **Checkpoint:** Q&A nyata berhasil, berbasis konteks server, tersimpan, dan kegagalannya tidak menghentikan bidding.
 
-## Phase 8 — AI Auctioneer
+## Phase 8 — AI Auctioneer (development mock)
 
-- [ ] Tambahkan komentar saat auction mulai.
-- [ ] Tambahkan trigger milestone bid dengan cooldown, bukan pada setiap bid.
-- [ ] Tambahkan komentar saat auction berakhir.
-- [ ] Backend menghitung metrik; AI hanya menyusun komentar.
-- [ ] Batasi satu komentar AI berjalan per room dan tangani response usang melalui snapshot metadata.
-- [ ] Pastikan proses AI tidak menahan transaksi bid atau closure.
-- [ ] Tampilkan komentar sebagai interaksi AI publik.
+- [x] Tambahkan komentar mock saat auction mulai.
+- [x] Tambahkan trigger milestone bid setiap 5 bid dengan cooldown 25 detik.
+- [x] Tambahkan komentar saat auction berakhir.
+- [x] Backend menghitung metrik dari state server; komentar tidak mengubah aturan lelang.
+- [x] Batasi satu komentar aktif per room dan labeli mock dengan metadata snapshot.
+- [x] Pastikan proses komentar terpisah dari jalur transaksi bid/closure.
+- [x] Tampilkan komentar sebagai interaksi AI publik.
 
-**Checkpoint:** komentar AI muncul untuk event penting tanpa mengontrol aturan atau menunda bidding.
+**Checkpoint:** komentar mock muncul untuk event penting tanpa mengontrol aturan atau menunda bidding. Real provider masih perlu diuji dengan credential backend yang dikonfigurasi.
 
 ## Phase 9 — Integrasi dan penyelesaian frontend
 
