@@ -90,7 +90,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 6 — Socket.IO
 
-- [ ] Buat Socket.IO server pada HTTP server.
+- [x] Buat development Socket.IO server nyata pada HTTP mock server yang sama (produksi masih belum tersedia).
 - [ ] Verifikasi JWT melalui handshake.
 - [ ] Implementasikan `auction:join` dan `auction:leave` beserta acknowledgment.
 - [ ] Kirim snapshot saat join.
@@ -100,8 +100,10 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Implementasikan join/leave, listener cleanup, reconnect, resync dan status koneksi.
 - [ ] Dispatch event socket ke Redux melalui action pada `auctionSlice` dan `socketSlice`.
 - [ ] Integrasikan listener lifecycle Socket.IO dengan `processAuctionEvent`, recovery/reconnect, dan cleanup; reducer event FE-04 sudah tersedia.
-- [ ] Verifikasi deduplikasi event dan abaikan versi state yang lebih lama melalui integrasi dua sesi.
-- [ ] Uji dua browser dan perpindahan antar-room.
+- [x] Verifikasi dua klien Socket.IO menerima broadcast yang sama, room lain tidak menerima event, dan Redux menerapkan event secara idempotent.
+- [x] Uji reconnect setelah server restart, pergantian room cepat, serta pergantian token akun pada tes integrasi multi-klien.
+
+**Batas FE-05:** checklist client lifecycle dan development mock di atas telah diimplementasikan. JWT produksi, broadcast setelah transaksi database, dua browser pada deployment, serta integrasi CORS/hosting masih memerlukan backend produksi dan tetap menjadi pekerjaan backend/integrasi deployment.
 
 **Checkpoint:** dua browser melihat harga, riwayat, deadline, dan status yang sama tanpa refresh.
 

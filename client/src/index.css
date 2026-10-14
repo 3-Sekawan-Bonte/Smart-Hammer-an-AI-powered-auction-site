@@ -269,6 +269,30 @@ textarea.input { min-height: 128px; resize: vertical; }
 .bid-person strong { font-size: 12px; }
 .bid-person span { margin-top: 2px; color: var(--muted); font-size: 10px; }
 .bid-amount { font-size: 12px; font-weight: 800; }
+.bid-panels-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; margin-top: 20px; align-items: start; }
+.bid-zone, .bid-history-panel { min-width: 0; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 12px 34px rgba(19, 28, 54, .05); }
+.bid-zone-head h2 { margin: 3px 0 0; font-size: 18px; }
+.bid-current-label { margin: 16px 0 0; color: var(--muted); font-size: 11px; font-weight: 700; }
+.bid-status-pill { flex: 0 0 auto; border-radius: 999px; background: var(--cyan-soft); color: var(--green); padding: 7px 10px; font-size: 10px; font-weight: 900; }
+.bid-unavailable { line-height: 1.6; }
+.bid-unavailable a { font-weight: 900; }
+.bid-form .btn { min-height: 52px; white-space: nowrap; }
+.bid-input:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; border-radius: 8px; }
+.bid-input:disabled { background: var(--surface-soft); color: var(--muted); cursor: not-allowed; }
+.bid-form-feedback { overflow-wrap: anywhere; }
+.bid-feedback-error, .bid-feedback-warning, .bid-history-error { border: 1px solid #f2d5a0; border-radius: 11px; background: #fff9e9; color: #805b13; padding: 11px 12px; font-size: 12px; line-height: 1.55; }
+.bid-feedback-error { border-color: #f0c5ca; background: #fff3f4; color: #9e3340; }
+.bid-feedback-success { margin-top: 12px; }
+.bid-history-panel { background: #fff; }
+.bid-history-panel .bid-list-head { border-top: 0; border-bottom: 1px solid var(--line); padding: 17px 18px; }
+.bid-list { list-style: none; margin: 0; padding: 0; }
+.bid-row.latest { background: #f2fbfa; }
+.bid-rank { width: 27px; height: 27px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--surface-soft); color: var(--muted); font-size: 10px; font-weight: 900; }
+.bid-row.latest .bid-rank { background: var(--cyan-soft); color: var(--green); }
+.bid-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding: 12px; color: var(--muted); font-size: 11px; }
+.bid-pagination .btn { min-height: 36px; padding: 0 11px; font-size: 11px; }
+.text-button { border: 0; background: transparent; color: var(--primary); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
+.bid-history-error { margin: 12px; }
 .ai-head > div { display: flex; align-items: center; gap: 10px; }
 .ai-orb { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; background: var(--ink); color: var(--cyan); }
 .ai-online { color: var(--green); font-size: 8px; font-weight: 900; letter-spacing: .1em; }
@@ -429,5 +453,5 @@ textarea.input { min-height: 128px; resize: vertical; }
 .confirm-dialog h2 { font-size: 30px; margin: 8px 0 12px; }
 .confirm-dialog p:not(.eyebrow) { color: var(--muted); line-height: 1.65; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-@media (max-width: 800px) { .fe03-detail-grid { grid-template-columns: 1fr; } .detail-image { min-height: 260px; } }
+@media (max-width: 800px) { .fe03-detail-grid, .bid-panels-grid { grid-template-columns: 1fr; } .detail-image { min-height: 260px; } }
 @media (max-width: 480px) { .pagination { gap: 8px; font-size: 11px; } .pagination .btn { padding-inline: 10px; } .detail-content { padding: 22px 18px; } .detail-side-card { padding: 22px 18px; } .fact-item { grid-template-columns: 1fr; gap: 5px; } .dialog-actions { flex-direction: column-reverse; } .dialog-actions .btn { width: 100%; } }

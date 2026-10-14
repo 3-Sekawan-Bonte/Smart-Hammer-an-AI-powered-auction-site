@@ -38,7 +38,7 @@ export default function Layout() {
         </div>
       </header>
       <main id="main-content"><Outlet /></main>
-      <footer className="footer"><div className="container footer-row"><div><Brand /><p className="small footer-copy">Mock lokal untuk fondasi frontend Smart Hammer.</p></div><div className="footer-meta"><span>React + Redux Toolkit</span><span>Development only · no real bidding/AI</span></div></div></footer>
+      <footer className="footer"><div className="container footer-row"><div><Brand /><p className="small footer-copy">Lelang demo dengan mock backend lokal.</p></div><div className="footer-meta"><span>React + Redux Toolkit</span><span>Development only · no real-money transactions</span></div></div></footer>
     </>
   );
 }

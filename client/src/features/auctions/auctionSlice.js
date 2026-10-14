@@ -148,18 +148,29 @@ export const loadAuctionSnapshot = createAsyncThunk(
 
 export const submitBid = createAsyncThunk(
   'auction/submitBid',
-  async ({ auctionId, amount, clientRequestId }, { rejectWithValue, getState }) => {
+  async ({ auctionId, amount, clientRequestId }, { rejectWithValue }) => {
     try {
       const response = await api.post(`/auctions/${auctionId}/bids`, {
         amount,
         clientRequestId,
       });
-      return getApiData(response);
-    } catch (error) {
-      if (error.response?.status === 409) {
-        return rejectWithValue({ code: error.response.data?.error?.code || 'CONFLICT', message: getApiError(error, 'Bid gagal, coba lagi.') });
+      const result = getApiData(response);
+      if (!result?.auction || !result?.bid || String(result.auction.id) !== String(auctionId) ||
+          String(result.bid.auctionId) !== String(auctionId) || result.clientRequestId !== clientRequestId ||
+          !Number.isSafeInteger(result.auction.version) || !Number.isSafeInteger(result.bid.id)) {
+        return rejectWithValue({ code: 'INVALID_RESPONSE', message: 'Server mengembalikan konfirmasi bid yang tidak valid.', uncertain: true });
       }
-      return rejectWithValue(getApiError(error, 'Bid gagal dikirim.'));
+      return result;
+    } catch (error) {
+      const apiError = error.response?.data?.error;
+      return rejectWithValue({
+        code: apiError?.code || null,
+        status: error.response?.status || null,
+        message: getApiError(error, 'Bid gagal dikirim.'),
+        fields: apiError?.fields || {},
+        details: apiError?.details || {},
+        uncertain: !error.response || error.response.status >= 500,
+      });
     }
   }
 );
@@ -193,13 +204,13 @@ export const loadAIInteractions = createAsyncThunk(
 
 export const loadBids = createAsyncThunk(
   'auction/loadBids',
-  async (auctionId, { rejectWithValue }) => {
+  async ({ auctionId, page = 1, limit = 20 }, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/auctions/${auctionId}/bids`);
+      const response = await api.get(`/auctions/${auctionId}/bids`, { params: { page, limit } });
       const result = getApiData(response);
       const bids = Array.isArray(result) ? result : result?.bids;
       if (!Array.isArray(bids)) throw new Error('Format riwayat bid tidak valid.');
-      return { bids, meta: result?.meta || null, auctionId: String(auctionId) };
+      return { bids, meta: response.data?.meta || result?.meta || null, auctionId: String(auctionId), page };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat bid.');
     }
@@ -303,7 +314,18 @@ function applyIncremental(active, payload, toCard) {
 function mergeEventCollections(active, payload) {
   const auctionId = active.currentId;
   const bids = payload.bids || (payload.bid ? [payload.bid] : []);
-  if (Array.isArray(bids)) active.bids = mergeBids(active.bids, bids, auctionId);
+  if (Array.isArray(bids)) {
+    active.bids = mergeBids(active.bids, bids, auctionId);
+    if ((Array.isArray(payload.bids) || payload.bid) && Number.isSafeInteger(payload.auction?.bidCount)) {
+      const limit = active.bidsMeta?.limit || 20;
+      active.bidsMeta = {
+        currentPage: active.bidsMeta?.currentPage || 1,
+        limit,
+        totalData: payload.auction.bidCount,
+        totalPages: Math.ceil(payload.auction.bidCount / limit),
+      };
+    }
+  }
   const interactions = payload.aiInteractions || (payload.interaction ? [payload.interaction] : []);
   if (Array.isArray(interactions)) active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, interactions, auctionId);
 }
@@ -479,13 +501,14 @@ const auctionSlice = createSlice({
       .addCase(submitBid.fulfilled, (state, action) => {
         if (!sameId(state.active.currentId, action.meta.arg.auctionId)) return;
         state.active.submitStatus = 'success';
-        if (action.payload?.auction) applyIncremental(state.active, action.payload, toAuctionCard);
+        if (action.payload?.auction && action.payload?.bid) applyIncremental(state.active, action.payload, toAuctionCard);
         else if (state.active.auction) {
           state.active.resyncRequired = true;
           state.active.resyncReason = 'Respons bid tidak menyertakan state lelang authoritative.';
         }
       })
       .addCase(submitBid.rejected, (state, action) => {
+        if (!sameId(state.active.currentId, action.meta.arg.auctionId)) return;
         state.active.submitStatus = 'error';
         state.active.error = action.payload;
       })
@@ -511,7 +534,7 @@ const auctionSlice = createSlice({
         if (state.active.aiRequestId === action.meta.requestId) state.active.aiRequestId = null;
       })
       .addCase(loadBids.pending, (state, action) => {
-        if (sameId(state.active.currentId, action.meta.arg)) state.active.bidsRequestId = action.meta.requestId;
+        if (sameId(state.active.currentId, action.meta.arg.auctionId)) state.active.bidsRequestId = action.meta.requestId;
       })
       .addCase(loadBids.fulfilled, (state, action) => {
         if (!sameId(state.active.currentId, action.payload.auctionId) || state.active.bidsRequestId !== action.meta.requestId) return;
@@ -580,6 +603,7 @@ export const selectServerTimeOffsetMs = (state) => state.auction.active.serverTi
 export const selectActiveResyncRequired = (state) => state.auction.active.resyncRequired;
 export const selectActiveResyncReason = (state) => state.auction.active.resyncReason;
 export const selectActiveBidsMeta = (state) => state.auction.active.bidsMeta;
+export const selectActiveBidsRequestId = (state) => state.auction.active.bidsRequestId;
 export const selectActiveAIMeta = (state) => state.auction.active.aiMeta;
 export const selectCurrentPrice = (state) => state.auction.active.auction?.currentPrice ?? null;
 export const selectNextMinimumBid = (state) => state.auction.active.auction?.nextMinimumBid ?? null;

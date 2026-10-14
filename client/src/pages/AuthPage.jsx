@@ -65,7 +65,7 @@ export default function AuthPage({ mode }) {
         <div className="auth-art-content">
           <p className="eyebrow amber-text">Smart Hammer membership</p>
           <h1 className="display">Masuk ke<br />arena lelang.</h1>
-      <p>Masuk untuk menjelajahi lelang demo dan mengikuti sinkronisasi room lokal. Event bid dan AI hanya simulasi development.</p>
+      <p>Masuk untuk ikut demo lelang. Bid diproses mock backend lokal; event AI masih simulasi development.</p>
         </div>
       </section>
       <section className="auth-panel">

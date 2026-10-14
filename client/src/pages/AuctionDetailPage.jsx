@@ -5,6 +5,8 @@ import { loadAuctionSnapshot, selectActiveAuction, selectActiveLoading, selectAc
 import { selectUser } from '../features/auth/authSlice';
 import { selectConnectionStatus, selectRoomError, selectRoomStatus } from '../features/socket/socketSlice';
 import { money } from '../components/AuctionCard';
+import BidForm from '../components/BidForm';
+import BidHistory from '../components/BidHistory';
 
 export default function AuctionDetailPage() {
   const { id } = useParams(); const dispatch = useDispatch(); const location = useLocation();
@@ -51,8 +53,9 @@ export default function AuctionDetailPage() {
       </div>
     </section><aside className="detail-side-card"><p className="eyebrow">Ringkasan lelang</p><div className="detail-price-block"><span>Harga {auction.bidCount ? 'saat ini' : 'awal'}</span><strong>{money(auction.currentPrice ?? auction.startingPrice)}</strong></div><dl className="detail-data"><div><dt>Harga awal</dt><dd>{money(auction.startingPrice)}</dd></div><div><dt>Minimum kenaikan</dt><dd>{money(auction.minIncrement)}</dd></div><div><dt>Status</dt><dd>{status === 'live' ? 'Sedang berlangsung' : status === 'ended' ? 'Berakhir' : 'Draft'}</dd></div><div><dt>Mulai</dt><dd>{formatWib(auction.startsAt) || 'Belum dimulai'}</dd></div><div><dt>Berakhir</dt><dd>{formatWib(auction.endsAt) || 'Ditentukan saat dimulai'}</dd></div><div><dt>Durasi</dt><dd>{formatDuration(auction.durationSeconds)}</dd></div></dl>
       {isOwner && isDraft && <div className="seller-actions"><Link className="btn btn-ghost" to={`/auctions/${auction.id}/edit`}>Edit draft</Link><button className="btn btn-primary" type="button" onClick={() => { setMessage(''); setConfirming(true); }}>Mulai lelang</button></div>}
-      {status === 'live' && <p className="detail-note">Harga dan deadline mengikuti data server. Simulasi event lokal hanya tersedia pada mock development.</p>}{status === 'ended' && <p className="detail-note">Hasil lelang mengikuti snapshot yang dikirim server.</p>}
+      {status === 'live' && <p className="detail-note">Harga dan deadline mengikuti data server. Bid dikirim melalui REST dan disinkronkan ke peserta room melalui Socket.IO.</p>}{status === 'ended' && <p className="detail-note">Hasil lelang mengikuti snapshot yang dikirim server.</p>}
     </aside></div>
+    <div className="bid-panels-grid"><BidForm auction={auction} user={user} /><BidHistory auctionId={auction.id} highestBidder={auction.highestBidder} /></div>
     {confirming && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && startStatus !== 'loading') setConfirming(false); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="start-title"><p className="eyebrow">Konfirmasi</p><h2 id="start-title" className="display">Mulai lelang sekarang?</h2><p>Waktu mulai dan berakhir akan ditetapkan server. Setelah dimulai, detail draft tidak dapat diedit.</p>{message && <p className="form-error" role="alert">{message}</p>}<div className="dialog-actions"><button ref={cancelDialogRef} className="btn btn-ghost" type="button" onClick={() => setConfirming(false)} disabled={startStatus === 'loading'}>Kembali</button><button className="btn btn-primary" type="button" onClick={handleStart} disabled={startStatus === 'loading'}>{startStatus === 'loading' ? 'Memulai…' : 'Ya, mulai lelang'}</button></div></section></div>}
   </div></div>;
 }

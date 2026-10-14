@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -245,18 +245,22 @@ test('draft creation applies contract defaults, validates fields, and protects o
   assert.equal(invalidImage.status, 400);
 });
 
-test('unsupported bidding and AI actions are explicit and do not mutate mock state', async (t) => {
+test('bids are accepted through the mock REST API while AI questions remain explicitly unavailable', async (t) => {
   const { request, login } = await createHarness(t);
   const token = await login();
-  for (const path of ['/auctions/12/bids', '/auctions/12/ai/questions']) {
-    const response = await request(path, { method: 'POST', headers: auth(token), body: JSON.stringify({ amount: 2100000 }) });
-    assert.equal(response.status, 501);
-    assert.equal((await response.json()).error.code, 'NOT_IMPLEMENTED');
-  }
+  const accepted = await request('/auctions/12/bids', { method: 'POST', headers: auth(token), body: JSON.stringify({ amount: 2100000, clientRequestId: randomUUID() }) });
+  assert.equal(accepted.status, 201);
+  const acceptedBody = (await accepted.json()).data;
+  assert.equal(acceptedBody.bid.amount, 2100000);
+  assert.equal(acceptedBody.auction.bidCount, 1);
+  assert.equal(acceptedBody.replayed, false);
+  const ai = await request('/auctions/12/ai/questions', { method: 'POST', headers: auth(token), body: JSON.stringify({ question: 'Apakah ada garansi?' }) });
+  assert.equal(ai.status, 501);
+  assert.equal((await ai.json()).error.code, 'NOT_IMPLEMENTED');
   const snapshot = await request('/auctions/12', { headers: auth(token) });
   const body = await snapshot.json();
-  assert.equal(body.data.auction.bidCount, 0);
-  assert.deepEqual(body.data.bids, []);
+  assert.equal(body.data.auction.bidCount, 1);
+  assert.equal(body.data.bids[0].amount, 2100000);
   assert.deepEqual(body.data.aiInteractions, []);
 });
 

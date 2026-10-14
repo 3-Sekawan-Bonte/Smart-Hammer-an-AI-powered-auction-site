@@ -9,6 +9,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Server as SocketIOServer } from 'socket.io';
 
 const defaultDatabasePath = process.env.BIDWAR_MOCK_DB || fileURLToPath(new URL('./db.json', import.meta.url));
 const defaultPort = Number(process.env.BIDWAR_MOCK_PORT || 3001);
@@ -194,7 +195,9 @@ function serializeAuction(database, auction) {
     minIncrement: Number(auction.minIncrement),
     nextMinimumBid: auction.status === 'draft' || auction.status === 'ended'
       ? null
-      : bidCount ? currentPrice + Number(auction.minIncrement) : Number(auction.startingPrice),
+      : bidCount
+        ? (currentPrice + Number(auction.minIncrement) <= MAX_AMOUNT ? currentPrice + Number(auction.minIncrement) : null)
+        : Number(auction.startingPrice),
     bidCount,
     durationSeconds: Number(auction.durationSeconds),
     startsAt: auction.startsAt ?? null,
@@ -218,6 +221,34 @@ function serializeBid(database, bid) {
     amount: Number(bid.amount),
     createdAt: bid.createdAt,
   };
+}
+
+function buildAuctionSnapshot(database, auctionId) {
+  const bids = database.bids.filter((bid) => Number(bid.auctionId) === Number(auctionId))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
+  const aiInteractions = database.aiInteractions.filter((item) => Number(item.auctionId) === Number(auctionId) && item.visibility === 'public')
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
+  const page = (items) => ({ currentPage: 1, limit: 20, totalData: items.length, totalPages: Math.ceil(items.length / 20) });
+  return {
+    auctionId: Number(auctionId),
+    serverNow: new Date().toISOString(),
+    auction: serializeAuction(database, database.auctions.find((auction) => Number(auction.id) === Number(auctionId))),
+    bids: bids.slice(0, 20).map((bid) => serializeBid(database, bid)),
+    aiInteractions: aiInteractions.slice(0, 20),
+    bidsMeta: page(bids),
+    aiMeta: page(aiInteractions),
+  };
+}
+
+function socketAuthError() {
+  const error = new Error('Unauthorized');
+  error.data = { code: 'UNAUTHORIZED' };
+  return error;
+}
+
+function isLoopbackRequest(request) {
+  const address = request.socket.remoteAddress || '';
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 function validateAuthBody(body, registerMode = false) {
@@ -300,8 +331,15 @@ function normalizeFacts(facts = {}) {
   };
 }
 
-export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret = defaultMockJwtSecret } = {}) {
-  return createServer(async (request, response) => {
+export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret = defaultMockJwtSecret, environment = process.env.NODE_ENV } = {}) {
+  let io;
+  let bidMutationQueue = Promise.resolve();
+  const serializeBidMutation = (operation) => {
+    const result = bidMutationQueue.then(operation, operation);
+    bidMutationQueue = result.catch(() => undefined);
+    return result;
+  };
+  const server = createServer(async (request, response) => {
     if (request.method === 'OPTIONS') return send(response, 204);
     try {
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
@@ -350,6 +388,103 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
 
       const currentUser = getCurrentUser(database, request, jwtSecret);
       if (!currentUser) return errorResponse(response, 401, 'UNAUTHORIZED', 'Silakan login untuk melanjutkan.');
+
+      const mockScenarioMatch = /^\/__mock\/auctions\/([^/]+)\/([a-z-]+)$/.exec(pathname);
+      if (mockScenarioMatch && request.method === 'POST') {
+        if (environment === 'production' || !isLoopbackRequest(request)) {
+          return errorResponse(response, 404, 'NOT_FOUND', 'Endpoint tidak ditemukan.');
+        }
+        const id = parseId(mockScenarioMatch[1]);
+        const scenario = mockScenarioMatch[2];
+        const auction = id && database.auctions.find((entry) => Number(entry.id) === id);
+        if (!id) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.');
+        if (!auction) return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
+        if (!io) return errorResponse(response, 503, 'MOCK_UNAVAILABLE', 'Socket.IO mock belum aktif.');
+        const room = `auction:${id}`;
+        const now = new Date().toISOString();
+        let eventName;
+        let payload;
+        if (scenario === 'bid' || scenario === 'duplicate-bid') {
+          if (auction.status !== 'live') return errorResponse(response, 409, 'AUCTION_NOT_LIVE', 'Simulasi bid hanya untuk lelang live.');
+          const bidder = database.users.find((user) => Number(user.id) !== Number(auction.sellerId ?? auction.seller?.id));
+          if (!bidder) return errorResponse(response, 409, 'NO_BIDDER', 'Tidak ada akun buyer mock.');
+          const currentAuction = serializeAuction(database, auction);
+          const amount = currentAuction.nextMinimumBid ?? currentAuction.startingPrice;
+          const bid = {
+            id: Math.max(0, ...database.bids.map((item) => Number(item.id) || 0)) + 1,
+            auctionId: id,
+            userId: Number(bidder.id),
+            amount,
+            createdAt: now,
+          };
+          database.bids.push(bid);
+          auction.currentPrice = amount;
+          auction.highestBidderId = Number(bidder.id);
+          auction.version = Number(auction.version ?? 0) + 1;
+          auction.updatedAt = now;
+          await saveDatabase(databasePath, database);
+          eventName = 'bid:updated';
+          payload = { auctionId: id, version: auction.version, serverNow: now, bid: serializeBid(database, bid), auction: serializeAuction(database, auction) };
+          io.to(room).emit(eventName, payload);
+          if (scenario === 'duplicate-bid') io.to(room).emit(eventName, payload);
+          return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, version: auction.version } });
+        }
+        if (scenario === 'end') {
+          if (auction.status === 'ended') return errorResponse(response, 409, 'AUCTION_ENDED', 'Lelang sudah berakhir.');
+          const currentAuction = serializeAuction(database, auction);
+          auction.status = 'ended';
+          auction.winnerId = currentAuction.highestBidderId;
+          auction.updatedAt = now;
+          auction.version = Number(auction.version ?? 0) + 1;
+          await saveDatabase(databasePath, database);
+          eventName = 'auction:ended';
+          payload = { auctionId: id, version: auction.version, serverNow: now, auction: serializeAuction(database, auction) };
+          io.to(room).emit(eventName, payload);
+          return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, version: auction.version } });
+        }
+        if (scenario === 'gap-event' || scenario === 'stale-event') {
+          const version = Number(auction.version ?? 0) + (scenario === 'gap-event' ? 2 : -1);
+          if (version < 0) return errorResponse(response, 409, 'VERSION_UNAVAILABLE', 'Versi lama tidak tersedia.');
+          eventName = 'bid:updated';
+          payload = { auctionId: id, version, serverNow: now, bid: null, auction: { ...serializeAuction(database, auction), version } };
+          io.to(room).emit(eventName, payload);
+          return send(response, 200, { message: 'Event kontrol development-only dikirim.', data: { event: eventName, version } });
+        }
+        if (['ai-pending', 'ai-message', 'ai-error'].includes(scenario)) {
+          let interaction = scenario === 'ai-pending' ? null : database.aiInteractions
+            .filter((item) => Number(item.auctionId) === id && item.visibility === 'public' && item.status === 'pending')
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+          if (interaction) interaction = { ...interaction };
+          else interaction = {
+              id: Math.max(0, ...database.aiInteractions.map((item) => Number(item.id) || 0)) + 1,
+              auctionId: id,
+              kind: 'question', visibility: 'public',
+              askedBy: { id: Number(currentUser.id), username: currentUser.username },
+              question: 'Apakah semua aksesori produk tersedia?',
+              answer: null, missingInformation: [], status: 'pending',
+              sourceVersion: Number(auction.version ?? 0), snapshotAt: now,
+              errorCode: null, createdAt: now, updatedAt: now,
+            };
+          if (scenario === 'ai-message') {
+            interaction.status = 'completed';
+            interaction.answer = 'Ini jawaban simulasi lokal; bukan hasil provider AI.';
+            interaction.missingInformation = ['Status aksesori perlu dikonfirmasi kepada penjual.'];
+            interaction.updatedAt = new Date(Date.now() + 1).toISOString();
+          } else if (scenario === 'ai-error') {
+            interaction.status = 'failed';
+            interaction.errorCode = 'AI_UNAVAILABLE';
+          }
+          const interactionIndex = database.aiInteractions.findIndex((item) => Number(item.id) === Number(interaction.id));
+          if (interactionIndex >= 0) database.aiInteractions[interactionIndex] = interaction;
+          else database.aiInteractions.push(interaction);
+          await saveDatabase(databasePath, database);
+          eventName = ({ 'ai-pending': 'ai:pending', 'ai-message': 'ai:message', 'ai-error': 'ai:error' })[scenario];
+          payload = { auctionId: id, version: Number(auction.version ?? 0), serverNow: now, interaction };
+          io.to(room).emit(eventName, payload);
+          return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, interaction } });
+        }
+        return errorResponse(response, 404, 'NOT_FOUND', 'Skenario mock tidak tersedia.');
+      }
 
       if (pathname === '/users/me' && request.method === 'GET') {
         return send(response, 200, { message: 'Profil berhasil diambil.', data: { user: selfUser(currentUser) } });
@@ -419,6 +554,114 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         return send(response, 201, { message: 'Draft lelang dibuat.', data: { auction: serializeAuction(database, auction) } });
       }
 
+      const bidMutationMatch = /^\/auctions\/([^/]+)\/bids$/.exec(pathname);
+      if (bidMutationMatch && request.method === 'POST') {
+        const auctionId = parseId(bidMutationMatch[1]);
+        if (!auctionId) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.', { id: 'ID harus integer positif.' });
+        const body = await readBody(request);
+        const fields = {};
+        for (const key of Object.keys(body)) if (!['amount', 'clientRequestId'].includes(key)) fields[key] = 'Field tidak diizinkan.';
+        if (!Number.isSafeInteger(body.amount) || body.amount < 1 || body.amount > MAX_AMOUNT) {
+          fields.amount = `Harus integer rupiah 1–${MAX_AMOUNT}.`;
+        }
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (typeof body.clientRequestId !== 'string' || !uuidPattern.test(body.clientRequestId)) {
+          fields.clientRequestId = 'Harus berupa UUID yang valid.';
+        }
+        if (Object.keys(fields).length) return errorResponse(response, 400, 'VALIDATION_ERROR', 'Data bid tidak valid.', fields);
+
+        const outcome = await serializeBidMutation(async () => {
+          const latest = await readDatabase(databasePath);
+          const bidder = latest.users.find((user) => Number(user.id) === Number(currentUser.id));
+          if (!bidder) return { status: 401, code: 'UNAUTHORIZED', message: 'Silakan login untuk melanjutkan.' };
+          latest.bids ||= [];
+          latest.bidRequests ||= [];
+          const prior = latest.bidRequests.find((entry) => Number(entry.userId) === Number(bidder.id) && entry.clientRequestId === body.clientRequestId);
+          if (prior) {
+            if (Number(prior.auctionId) !== auctionId || Number(prior.amount) !== body.amount) {
+              return { status: 409, code: 'IDEMPOTENCY_CONFLICT', message: 'clientRequestId sudah digunakan untuk payload bid lain.' };
+            }
+            const originalAuction = latest.auctions.find((entry) => Number(entry.id) === auctionId);
+            const originalBid = latest.bids.find((entry) => Number(entry.id) === Number(prior.bidId));
+            if (!originalAuction || !originalBid) return { status: 404, code: 'NOT_FOUND', message: 'Lelang tidak ditemukan.' };
+            const serverNow = new Date().toISOString();
+            return {
+              status: 200,
+              message: 'Request bid sebelumnya sudah diterima.',
+              data: {
+                auctionId, serverNow, version: Number(originalAuction.version), auction: serializeAuction(latest, originalAuction),
+                bid: serializeBid(latest, originalBid), clientRequestId: body.clientRequestId, replayed: true,
+              },
+            };
+          }
+
+          const auction = latest.auctions.find((entry) => Number(entry.id) === auctionId);
+          if (!auction || (auction.status === 'draft' && !isOwner(auction, bidder))) {
+            return { status: 404, code: 'NOT_FOUND', message: 'Lelang tidak ditemukan.' };
+          }
+          if (isOwner(auction, bidder)) return { status: 403, code: 'SELF_BID_FORBIDDEN', message: 'Pemilik lelang tidak dapat menawar lelangnya sendiri.' };
+          if (auction.status === 'ended') return { status: 409, code: 'AUCTION_ENDED', message: 'Lelang sudah berakhir.' };
+          if (auction.status !== 'live') return { status: 409, code: 'AUCTION_NOT_LIVE', message: 'Lelang belum berlangsung.' };
+          const now = new Date();
+          if (!auction.endsAt || !Number.isFinite(Date.parse(auction.endsAt)) || now.getTime() >= Date.parse(auction.endsAt)) {
+            const currentAuction = serializeAuction(latest, auction);
+            auction.status = 'ended';
+            auction.winnerId = currentAuction.highestBidderId;
+            auction.updatedAt = now.toISOString();
+            auction.version = Number(auction.version ?? 0) + 1;
+            await saveDatabase(databasePath, latest);
+            return {
+              status: 409,
+              code: 'AUCTION_ENDED',
+              message: 'Waktu lelang sudah berakhir.',
+              broadcast: true,
+              eventName: 'auction:ended',
+              event: { auctionId, version: auction.version, serverNow: now.toISOString(), auction: serializeAuction(latest, auction) },
+            };
+          }
+          const currentAuction = serializeAuction(latest, auction);
+          const minimum = currentAuction.nextMinimumBid;
+          if (minimum == null) return { status: 409, code: 'BID_LIMIT_REACHED', message: 'Batas nominal lelang sudah tercapai.', details: { auctionId, version: Number(auction.version) } };
+          if (body.amount < minimum) {
+            return { status: 409, code: 'BID_TOO_LOW', message: 'Penawaran di bawah minimum terbaru.', details: { auctionId, nextMinimumBid: minimum, version: Number(auction.version) } };
+          }
+
+          const serverNow = now.toISOString();
+          const bid = {
+            id: Math.max(0, ...latest.bids.map((entry) => Number(entry.id) || 0)) + 1,
+            auctionId,
+            userId: Number(bidder.id),
+            amount: body.amount,
+            clientRequestId: body.clientRequestId,
+            createdAt: serverNow,
+          };
+          latest.bids.push(bid);
+          auction.currentPrice = body.amount;
+          auction.highestBidderId = Number(bidder.id);
+          const extendedDeadline = now.getTime() + 3_600_000;
+          if (extendedDeadline > Date.parse(auction.endsAt)) auction.endsAt = new Date(extendedDeadline).toISOString();
+          auction.version = Number(auction.version ?? 0) + 1;
+          auction.updatedAt = serverNow;
+          latest.bidRequests.push({ userId: Number(bidder.id), clientRequestId: body.clientRequestId, auctionId, amount: body.amount, bidId: bid.id });
+          await saveDatabase(databasePath, latest);
+          const data = {
+            auctionId, serverNow, version: auction.version, auction: serializeAuction(latest, auction),
+            bid: serializeBid(latest, bid), clientRequestId: body.clientRequestId, replayed: false,
+          };
+          return {
+            status: 201,
+            message: 'Penawaran diterima.',
+            data,
+            broadcast: true,
+            event: { auctionId, serverNow, version: auction.version, bid: data.bid, auction: data.auction },
+          };
+        });
+
+        if (outcome.broadcast) io?.to(`auction:${auctionId}`).emit(outcome.eventName || 'bid:updated', outcome.event);
+        if (outcome.code) return errorResponse(response, outcome.status, outcome.code, outcome.message, {}, outcome.details || {});
+        return send(response, outcome.status, { message: outcome.message, data: outcome.data });
+      }
+
       const auctionMatch = /^\/auctions\/([^/]+)$/.exec(pathname);
       if (auctionMatch && request.method === 'PATCH') {
         const id = parseId(auctionMatch[1]);
@@ -457,6 +700,12 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         auction.updatedAt = now.toISOString();
         auction.version = Number(auction.version ?? 0) + 1;
         await saveDatabase(databasePath, database);
+        io?.to(`auction:${id}`).emit('auction:started', {
+          auctionId: id,
+          version: auction.version,
+          serverNow: now.toISOString(),
+          auction: serializeAuction(database, auction),
+        });
         return send(response, 200, { message: 'Lelang dimulai.', data: { auction: serializeAuction(database, auction) } });
       }
       if (auctionMatch && request.method === 'GET') {
@@ -515,7 +764,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         return send(response, 200, { message: 'Riwayat AI berhasil diambil.', data: page.data, meta: page.meta });
       }
 
-      if (/^\/auctions\/[^/]+\/(?:bids|ai\/questions)$/.test(pathname) && request.method === 'POST') {
+      if (/^\/auctions\/[^/]+\/ai\/questions$/.test(pathname) && request.method === 'POST') {
         return errorResponse(response, 501, 'NOT_IMPLEMENTED', 'Aksi ini belum tersedia pada mock FE-01.');
       }
       if (/^\/auctions\/[^/]+$/.test(pathname) && request.method === 'DELETE') {
@@ -530,14 +779,79 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         {}, {});
     }
   });
+
+  io = new SocketIOServer(server, {
+    path: '/socket.io',
+    cors: { origin: '*', methods: ['GET', 'POST'] },
+    transports: ['websocket', 'polling'],
+  });
+  server.io = io;
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+      const userId = verifyMockAccessToken(token, jwtSecret);
+      if (!userId) return next(socketAuthError());
+      const database = await readDatabase(databasePath);
+      const user = database.users.find((item) => Number(item.id) === userId);
+      if (!user) return next(socketAuthError());
+      socket.data.userId = userId;
+      socket.data.accessToken = token;
+      next();
+    } catch {
+      next(socketAuthError());
+    }
+  });
+  io.on('connection', (socket) => {
+    const decoded = JSON.parse(Buffer.from(socket.data.accessToken.split('.')[1], 'base64url').toString('utf8'));
+    const expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, decoded.exp * 1000 - Date.now()));
+    expiryTimer.unref?.();
+    socket.on('disconnect', () => clearTimeout(expiryTimer));
+    socket.on('auction:join', async (payload = {}, acknowledge = () => {}) => {
+      const auctionId = parseId(String(payload.auctionId ?? ''));
+      if (!auctionId) return acknowledge({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'Auction ID tidak valid.' } });
+      try {
+        const database = await readDatabase(databasePath);
+        const auction = database.auctions.find((item) => Number(item.id) === auctionId);
+        const user = database.users.find((item) => Number(item.id) === socket.data.userId);
+        if (!user) return acknowledge({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } });
+        if (!auction || (auction.status === 'draft' && !isOwner(auction, user))) {
+          return acknowledge({ ok: false, error: { code: 'NOT_FOUND', message: 'Auction unavailable.' } });
+        }
+        await socket.join(`auction:${auctionId}`);
+        socket.emit('auction:snapshot', buildAuctionSnapshot(database, auctionId));
+        acknowledge({ ok: true, data: { auctionId } });
+      } catch {
+        acknowledge({ ok: false, error: { code: 'MOCK_UNAVAILABLE', message: 'Snapshot lelang tidak tersedia.' } });
+      }
+    });
+    socket.on('auction:leave', async (payload = {}, acknowledge = () => {}) => {
+      const auctionId = parseId(String(payload.auctionId ?? ''));
+      if (!auctionId) return acknowledge({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'Auction ID tidak valid.' } });
+      await socket.leave(`auction:${auctionId}`);
+      acknowledge({ ok: true, data: { auctionId } });
+    });
+  });
+  return server;
 }
 
 export function startMockServer({ port = defaultPort, host = '127.0.0.1', databasePath = defaultDatabasePath } = {}) {
   const server = createMockServer({ databasePath });
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port mock ${port} sudah digunakan. Hentikan mock server yang memang Anda jalankan atau atur BIDWAR_MOCK_PORT secara eksplisit.`);
+    } else {
+      console.error(`Mock server gagal dijalankan: ${error.message}`);
+    }
+    process.exitCode = 1;
+  });
   server.listen(port, host, () => {
     console.log(`Smart Hammer MOCK API (development only) berjalan di http://${host}:${port}`);
-    console.log(`Data tersimpan lokal di ${databasePath}; tidak ada backend produksi, bidding, realtime, atau AI aktif.`);
+    console.log(`Socket.IO tersedia di http://${host}:${port}/socket.io; data tersimpan lokal di ${databasePath}.`);
+    console.log('Bidding/AI yang tersedia hanya simulasi development melalui endpoint /__mock; bukan backend produksi.');
   });
+  const shutdown = () => server.io.close(() => { process.exitCode = 0; });
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
   return server;
 }
 
