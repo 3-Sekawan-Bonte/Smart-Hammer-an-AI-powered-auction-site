@@ -102,16 +102,16 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 7 — AI Product Q&A
 
-- [ ] Buat service provider AI backend.
-- [ ] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
-- [ ] Simpan interaction `pending` sebelum proses AI.
-- [ ] Ambil product facts dan auction snapshot dari server.
-- [ ] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
-- [ ] Simpan hasil `completed`/`failed` serta snapshot metadata.
-- [ ] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
+- [x] Buat service provider AI backend.
+- [x] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
+- [x] Simpan interaction `pending` sebelum proses AI.
+- [x] Ambil product facts dan auction snapshot dari server.
+- [x] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
+- [x] Simpan hasil `completed`/`failed` serta snapshot metadata.
+- [x] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
 - [ ] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
 - [ ] Bangun AIPanel frontend dengan status pending/completed/failed.
-- [ ] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
+- [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
 
 **Checkpoint:** Q&A nyata berhasil, berbasis konteks server, tersimpan, dan kegagalannya tidak menghentikan bidding.
 
