@@ -1,0 +1,22 @@
+node_modules/
+client/dist/
+client/.env
+client/.env.*
+!client/.env.example
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+AGENTS project.md
+ARCHITECTURE.md
+commit-auth.sh
+FE01_CHANGELOG.md
+FE01_UI_AUDIT.md
+FE02_CHANGELOG.md
+package.json
+AGENTS.md
+PRD.md
+README.md
+PROJECT.md
+!client/package.json
