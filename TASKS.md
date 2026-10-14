@@ -9,6 +9,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] FE-03 Auction UI: listing/pagination, create draft, owner-only edit draft, detail, start dengan konfirmasi, mock API lifecycle, dan validasi FE-03 terverifikasi. Lihat `FE03_IMPLEMENTATION_REPORT.md`.
 - [x] FE-04 Auction Room State Management: snapshot Redux tervalidasi, merge bid/AI deduplicated, version guard, resync state, room isolation, selectors/hooks, dan reducer tests terverifikasi. Lihat `FE04_CHANGELOG.md`.
 - [x] FE-06 Live Bidding UI + functional development mock: BidForm, BidHistory, REST submission, UUID idempotency, server-side validation, serialized local mock writes, sliding deadline, and real Socket.IO broadcasts verified. Lihat `FE06_CHANGELOG.md`; BE-05 production transaction/locking remains incomplete.
+- [x] FE-07 Countdown and Auction Results: server-time-aware local countdown, zero-time confirmation/resync, authoritative winner/no-bid banner, persistent mock closure scheduler, startup/read-time recovery, serialized bid/closure, and `auction:ended` broadcast verified. Lihat `FE07_CHANGELOG.md`; BE-06 production scheduler/transaction/locking remains incomplete.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
 - [ ] Siapkan frontend React + Vite + Tailwind CSS.
@@ -80,14 +81,16 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 5 — Penutupan dan countdown
 
-- [ ] Implementasikan service penutupan yang memakai lock Auction yang sama dengan bid.
-- [ ] Tambahkan pemeriksaan deadline berkala.
-- [ ] Tambahkan startup recovery untuk auction live yang sudah expired.
-- [ ] Tentukan winner/finalPrice secara idempotent.
-- [ ] Tangani lelang berakhir tanpa bid.
-- [ ] Pastikan bid tepat pada/setelah deadline ditolak.
-- [ ] Implementasikan countdown frontend dengan `endsAt` terbaru dan koreksi `serverNow`.
-- [ ] Uji penutupan berulang, sliding deadline, dan restart recovery.
+**Development mock FE-07:** countdown memakai server clock offset dan `endsAt`; mock menutup lelang berkala, pada startup, saat snapshot dibaca, dan ketika bid tiba setelah deadline. Closure idempotent, memakai antrean serial yang sama dengan bid, menyimpan winner/no-bid result ke file JSON persisten, lalu menyiarkan `auction:ended`. Integration tests mencakup scheduler, recovery, read-time closure, sliding deadline, dan race bid/closure. Lihat `FE07_CHANGELOG.md`.
+
+- [x] Development mock: service penutupan memakai antrean serial yang sama dengan bid.
+- [x] Development mock: pemeriksaan deadline berkala dan graceful timer cleanup.
+- [x] Development mock: startup recovery dari file state JSON persisten.
+- [x] Development mock: winner/finalPrice serta hasil tanpa bid secara idempotent.
+- [x] Development mock: bid tepat pada/setelah deadline ditolak dan state ditutup.
+- [x] Frontend: countdown memakai `endsAt` terbaru dan koreksi `serverNow`, tanpa menentukan status akhir.
+- [x] Tes mock: closure berulang, sliding deadline, restart recovery, dan race bid/closure.
+- [ ] Production BE-06: scheduler, recovery, transaksi dan row lock database masih belum tersedia/terverifikasi.
 
 **Checkpoint:** waktu dan hasil lelang diputuskan backend, termasuk jika scheduler terlambat atau server restart.
 
