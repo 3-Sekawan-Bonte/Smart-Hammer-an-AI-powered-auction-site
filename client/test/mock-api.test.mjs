@@ -213,10 +213,10 @@ test('draft creation applies contract defaults, validates fields, and protects o
   assert.equal(invalidImage.status, 400);
 });
 
-test('unsupported bidding, AI, and start actions are explicit and do not mutate mock state', async (t) => {
+test('unsupported bidding and AI actions are explicit and do not mutate mock state', async (t) => {
   const { request, login } = await createHarness(t);
   const token = await login();
-  for (const path of ['/auctions/12/bids', '/auctions/12/ai/questions', '/auctions/12/start']) {
+  for (const path of ['/auctions/12/bids', '/auctions/12/ai/questions']) {
     const response = await request(path, { method: 'POST', headers: auth(token), body: JSON.stringify({ amount: 2100000 }) });
     assert.equal(response.status, 501);
     assert.equal((await response.json()).error.code, 'NOT_IMPLEMENTED');
@@ -226,6 +226,44 @@ test('unsupported bidding, AI, and start actions are explicit and do not mutate 
   assert.equal(body.data.auction.bidCount, 0);
   assert.deepEqual(body.data.bids, []);
   assert.deepEqual(body.data.aiInteractions, []);
+});
+
+test('draft PATCH enforces owner and draft state, replaces product facts, and start is one-time', async (t) => {
+  const { request, login } = await createHarness(t);
+  const sellerToken = await login('seller@smart-hammer.id', 'smart123');
+  const otherToken = await login();
+  const payload = { title: 'Headphone Draft', description: 'Draft description long enough.', condition: 'used_good', productFacts: { specifications: 'Bluetooth', defects: 'Scratch', accessories: ['Case'], warranty: 'No warranty' }, imageUrl: 'https://example.com/headphones.jpg', startingPrice: 300000, minIncrement: 10000, durationSeconds: 600 };
+  const creation = await request('/auctions', { method: 'POST', headers: auth(sellerToken), body: JSON.stringify(payload) });
+  const draft = (await creation.json()).data.auction;
+  const forbidden = await request(`/auctions/${draft.id}`, { method: 'PATCH', headers: auth(otherToken), body: JSON.stringify({ title: 'Hijacked title' }) });
+  assert.equal(forbidden.status, 403);
+  assert.equal((await forbidden.json()).error.code, 'FORBIDDEN');
+  const empty = await request(`/auctions/${draft.id}`, { method: 'PATCH', headers: auth(sellerToken), body: '{}' });
+  assert.equal(empty.status, 400);
+  const updatedResponse = await request(`/auctions/${draft.id}`, { method: 'PATCH', headers: auth(sellerToken), body: JSON.stringify({ title: 'Updated headphone', productFacts: { specifications: 'USB-C', defects: null, accessories: [], warranty: 'One year' } }) });
+  assert.equal(updatedResponse.status, 200);
+  const updated = (await updatedResponse.json()).data.auction;
+  assert.equal(updated.title, 'Updated headphone');
+  assert.equal(updated.version, draft.version + 1);
+  assert.deepEqual(updated.productFacts, { specifications: 'USB-C', defects: null, accessories: [], warranty: 'One year' });
+  const startedResponse = await request(`/auctions/${draft.id}/start`, { method: 'POST', headers: auth(sellerToken) });
+  assert.equal(startedResponse.status, 200);
+  const started = (await startedResponse.json()).data.auction;
+  assert.equal(started.status, 'live');
+  assert.equal(Date.parse(started.endsAt) - Date.parse(started.startsAt), 600000);
+  const repeated = await request(`/auctions/${draft.id}/start`, { method: 'POST', headers: auth(sellerToken) });
+  assert.equal(repeated.status, 409);
+  assert.equal((await repeated.json()).error.code, 'AUCTION_NOT_DRAFT');
+  const unchanged = (await (await request(`/auctions/${draft.id}`, { headers: auth(sellerToken) })).json()).data.auction;
+  assert.equal(unchanged.endsAt, started.endsAt);
+  const liveEdit = await request(`/auctions/${draft.id}`, { method: 'PATCH', headers: auth(sellerToken), body: JSON.stringify({ title: 'Cannot edit live' }) });
+  assert.equal(liveEdit.status, 409);
+  assert.equal((await liveEdit.json()).error.code, 'AUCTION_NOT_DRAFT');
+  const endedEdit = await request('/auctions/7', { method: 'PATCH', headers: auth(sellerToken), body: JSON.stringify({ title: 'Cannot edit ended' }) });
+  assert.equal(endedEdit.status, 409);
+  assert.equal((await endedEdit.json()).error.code, 'AUCTION_NOT_DRAFT');
+  const otherStart = await request('/auctions/12/start', { method: 'POST', headers: auth(otherToken) });
+  assert.equal(otherStart.status, 403);
 });
 
 test('generic user collection access cannot expose mock passwords', async (t) => {

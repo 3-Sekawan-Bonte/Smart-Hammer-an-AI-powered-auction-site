@@ -4,6 +4,8 @@ import api, { getApiData, getApiError } from '../../lib/api.js';
 const initialState = {
   catalog: {
     auctions: [],
+    meta: { currentPage: 1, limit: 10, totalData: 0, totalPages: 0 },
+    page: 1,
     loading: false,
     error: null,
   },
@@ -11,6 +13,8 @@ const initialState = {
     status: 'idle',
     error: null,
   },
+  edit: { status: 'idle', error: null },
+  start: { status: 'idle', error: null },
   active: {
     auction: null,
     bids: [],
@@ -37,15 +41,24 @@ const fixtureImagePositions = {
 };
 
 function toAuctionCard(item) {
-  const seller = typeof item.seller === 'object' ? item.seller?.username : item.seller;
   return {
     ...item,
     category: item.category || 'electronics',
     price: Number(item.currentPrice ?? item.startingPrice ?? 0),
     bids: Number(item.bidCount ?? 0),
     time: remainingTime(item.endsAt),
-    seller: seller || 'seller.smart-hammer',
+    seller: item.seller || { id: item.sellerId ?? null, username: 'seller.smart-hammer' },
+    sellerName: (typeof item.seller === 'object' ? item.seller?.username : item.seller) || 'seller.smart-hammer',
     visualPosition: item.visualPosition || fixtureImagePositions[item.id] || '50% 50%',
+  };
+}
+
+function requestError(error, fallback) {
+  const apiError = error.response?.data?.error;
+  return {
+    message: getApiError(error, fallback),
+    code: apiError?.code || null,
+    fields: apiError?.fields || {},
   };
 }
 
@@ -65,12 +78,12 @@ function dedupe(items, id) {
 
 export const loadAuctions = createAsyncThunk(
   'auction/loadAuctions',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get('/auctions');
+      const response = await api.get('/auctions', { params: { page, limit } });
       const auctions = getApiData(response);
       if (!Array.isArray(auctions)) throw new Error('Format respons daftar lelang tidak valid.');
-      return auctions.map(toAuctionCard);
+      return { auctions: auctions.map(toAuctionCard), meta: response.data?.meta || { currentPage: page, limit, totalData: auctions.length, totalPages: 1 } };
     } catch (error) {
       return rejectWithValue(getApiError(error, error.message || 'Daftar lelang gagal dimuat.'));
     }
@@ -85,7 +98,33 @@ export const createAuction = createAsyncThunk(
       const result = getApiData(response);
       return toAuctionCard(result.auction ?? result);
     } catch (error) {
-      return rejectWithValue(getApiError(error, 'Lelang gagal disimpan. Periksa data dan coba lagi.'));
+      return rejectWithValue(requestError(error, 'Lelang gagal disimpan. Periksa data dan coba lagi.'));
+    }
+  }
+);
+
+export const updateAuction = createAsyncThunk(
+  'auction/updateAuction',
+  async ({ auctionId, payload }, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(`/auctions/${auctionId}`, payload);
+      const result = getApiData(response);
+      return toAuctionCard(result.auction ?? result);
+    } catch (error) {
+      return rejectWithValue(requestError(error, 'Draft gagal diperbarui. Periksa data dan coba lagi.'));
+    }
+  }
+);
+
+export const startAuction = createAsyncThunk(
+  'auction/startAuction',
+  async (auctionId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/auctions/${auctionId}/start`);
+      const result = getApiData(response);
+      return toAuctionCard(result.auction ?? result);
+    } catch (error) {
+      return rejectWithValue(requestError(error, 'Lelang gagal dimulai. Muat ulang dan coba lagi.'));
     }
   }
 );
@@ -115,9 +154,9 @@ export const submitBid = createAsyncThunk(
       return getApiData(response);
     } catch (error) {
       if (error.response?.status === 409) {
-        return rejectWithValue({ code: 'CONFLICT', message: error.response.data?.error?.message || 'Bid gagal, coba lagi.' });
+        return rejectWithValue({ code: error.response.data?.error?.code || 'CONFLICT', message: getApiError(error, 'Bid gagal, coba lagi.') });
       }
-      return rejectWithValue(error.response?.data?.error?.message || 'Bid gagal dikirim.');
+      return rejectWithValue(getApiError(error, 'Bid gagal dikirim.'));
     }
   }
 );
@@ -271,6 +310,12 @@ const auctionSlice = createSlice({
     clearCatalogError(state) {
       state.catalog.error = null;
     },
+    resetEditStatus(state) {
+      state.edit = { status: 'idle', error: null };
+    },
+    resetStartStatus(state) {
+      state.start = { status: 'idle', error: null };
+    },
     resetCreateStatus(state) {
       state.create.status = 'idle';
       state.create.error = null;
@@ -284,7 +329,9 @@ const auctionSlice = createSlice({
       })
       .addCase(loadAuctions.fulfilled, (state, action) => {
         state.catalog.loading = false;
-        state.catalog.auctions = action.payload;
+        state.catalog.auctions = action.payload.auctions;
+        state.catalog.meta = action.payload.meta;
+        state.catalog.page = action.payload.meta.currentPage;
         state.catalog.error = null;
       })
       .addCase(loadAuctions.rejected, (state, action) => {
@@ -301,6 +348,36 @@ const auctionSlice = createSlice({
       .addCase(createAuction.rejected, (state, action) => {
         state.create.status = 'error';
         state.create.error = action.payload;
+      })
+      .addCase(updateAuction.pending, (state) => {
+        state.edit.status = 'loading';
+        state.edit.error = null;
+      })
+      .addCase(updateAuction.fulfilled, (state, action) => {
+        state.edit.status = 'success';
+        if (state.active.currentId === String(action.payload.id)) {
+          state.active.auction = action.payload;
+          state.active.version = action.payload.version ?? state.active.version;
+        }
+      })
+      .addCase(updateAuction.rejected, (state, action) => {
+        state.edit.status = 'error';
+        state.edit.error = action.payload;
+      })
+      .addCase(startAuction.pending, (state) => {
+        state.start.status = 'loading';
+        state.start.error = null;
+      })
+      .addCase(startAuction.fulfilled, (state, action) => {
+        state.start.status = 'success';
+        if (state.active.currentId === String(action.payload.id)) {
+          state.active.auction = action.payload;
+          state.active.version = action.payload.version ?? state.active.version;
+        }
+      })
+      .addCase(startAuction.rejected, (state, action) => {
+        state.start.status = 'error';
+        state.start.error = action.payload;
       })
       .addCase(loadAuctionSnapshot.pending, (state, action) => {
         state.active.loading = true;
@@ -360,9 +437,13 @@ const auctionSlice = createSlice({
       })
       .addCase('auth/logout', (state) => {
         state.catalog.auctions = [];
+        state.catalog.meta = initialState.catalog.meta;
+        state.catalog.page = 1;
         state.catalog.error = null;
         state.active = { ...initialState.active, loading: false };
         state.create = { ...initialState.create };
+        state.edit = { ...initialState.edit };
+        state.start = { ...initialState.start };
       });
   },
 });
@@ -384,10 +465,15 @@ export const {
 } = auctionSlice.actions;
 
 export const selectCatalogAuctions = (state) => state.auction.catalog.auctions;
+export const selectCatalogMeta = (state) => state.auction.catalog.meta;
 export const selectCatalogLoading = (state) => state.auction.catalog.loading;
 export const selectCatalogError = (state) => state.auction.catalog.error;
 export const selectCreateStatus = (state) => state.auction.create.status;
 export const selectCreateError = (state) => state.auction.create.error;
+export const selectEditStatus = (state) => state.auction.edit.status;
+export const selectEditError = (state) => state.auction.edit.error;
+export const selectStartStatus = (state) => state.auction.start.status;
+export const selectStartError = (state) => state.auction.start.error;
 
 export const selectActiveAuction = (state) => state.auction.active.auction;
 export const selectActiveBids = (state) => state.auction.active.bids;

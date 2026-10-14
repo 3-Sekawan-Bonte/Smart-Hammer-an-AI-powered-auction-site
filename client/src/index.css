@@ -242,12 +242,17 @@ textarea.input { min-height: 128px; resize: vertical; }
 .next-bid strong { color: var(--ink); }
 .bid-form { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin-top: 20px; }
 .bid-unavailable { margin-top: 19px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); padding: 15px 16px; color: var(--muted); font-size: 12px; font-weight: 800; text-align: center; }
+.bid-unavailable a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 .currency-input { min-width: 0; min-height: 52px; display: grid; grid-template-columns: auto 1fr; align-items: center; border: 1px solid var(--line); border-radius: 13px; background: white; overflow: hidden; }
 .currency-input > span { border-right: 1px solid var(--line); padding: 0 11px; color: var(--muted); font-size: 11px; font-weight: 800; }
 .bid-input { min-width: 0; width: 100%; height: 50px; border: 0; outline: 0; padding: 0 11px; font-size: 15px; font-weight: 800; }
 .quick-bids { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
 .quick-bid { min-height: 34px; flex: 1; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--muted); padding: 0 9px; font-size: 10px; font-weight: 800; }
 .quick-bid:hover { border-color: var(--primary); color: var(--primary); }
+.quick-bid:disabled { cursor: not-allowed; opacity: .55; }
+.bid-feedback { margin: 10px 0 0; }
+.bid-success { border: 1px solid #bcebdd; border-radius: 12px; background: #effbf7; color: var(--green); padding: 11px 13px; font-size: 12px; font-weight: 700; }
 .secure-note { margin: 14px 0 0; color: var(--muted); font-size: 10px; }
 .bid-list { max-height: 315px; overflow: auto; }
 .bid-list-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding: 15px 18px 8px; }
@@ -382,3 +387,45 @@ textarea.input { min-height: 128px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.badge-draft { color: #704b08; background: #fff0c2; }
+.card-visual { position: relative; }
+.card-product-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero-product-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 28px 0 0; color: var(--muted); font-size: 13px; }
+.fe03-detail { max-width: 1120px; }
+.detail-topline { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 22px; }
+.back-link { color: var(--muted); text-decoration: none; font-weight: 700; }
+.notice-card { border: 1px solid #bcebdd; background: var(--cyan-soft); color: var(--green); padding: 14px 18px; border-radius: 14px; margin: 0 0 18px; }
+.fe03-detail-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(290px, .8fr); gap: 22px; align-items: start; }
+.detail-main-card, .detail-side-card { background: white; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: 0 18px 50px rgba(19, 28, 54, .06); }
+.detail-image { position: relative; min-height: 300px; background: #f2f4f8; }
+.detail-image img, .detail-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.detail-fallback { background-size: 300% 200%; }
+.detail-content { padding: clamp(22px, 4vw, 42px); }
+.detail-content h1 { font-size: clamp(32px, 4vw, 48px); line-height: 1.06; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.seller-line { color: var(--muted); margin: 0 0 20px; }
+.seller-line strong { color: var(--ink); }
+.detail-description { color: #39445d; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fe03-facts { display: grid; gap: 0; margin-top: 24px; border-top: 1px solid var(--line); }
+.fact-item { display: grid; grid-template-columns: minmax(110px, .55fr) 1fr; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--line); }
+.fact-item span { color: var(--muted); font-size: 13px; }
+.fact-item strong { font-size: 14px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.detail-side-card { padding: 26px; }
+.detail-price-block { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.detail-price-block span { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.detail-price-block strong { font-size: clamp(24px, 3vw, 32px); letter-spacing: -.04em; overflow-wrap: anywhere; }
+.detail-data { margin: 8px 0 18px; }
+.detail-data div { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.detail-data dt { color: var(--muted); font-size: 13px; }
+.detail-data dd { margin: 0; text-align: right; font-size: 13px; font-weight: 700; }
+.seller-actions { display: grid; gap: 10px; }
+.seller-actions .btn { width: 100%; }
+.detail-note { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 18px 0 0; }
+.dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(10, 17, 34, .58); }
+.confirm-dialog { width: min(100%, 480px); background: white; border-radius: 22px; padding: clamp(24px, 5vw, 38px); box-shadow: 0 24px 80px rgba(0,0,0,.25); }
+.confirm-dialog h2 { font-size: 30px; margin: 8px 0 12px; }
+.confirm-dialog p:not(.eyebrow) { color: var(--muted); line-height: 1.65; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+@media (max-width: 800px) { .fe03-detail-grid { grid-template-columns: 1fr; } .detail-image { min-height: 260px; } }
+@media (max-width: 480px) { .pagination { gap: 8px; font-size: 11px; } .pagination .btn { padding-inline: 10px; } .detail-content { padding: 22px 18px; } .detail-side-card { padding: 22px 18px; } .fact-item { grid-template-columns: 1fr; gap: 5px; } .dialog-actions { flex-direction: column-reverse; } .dialog-actions .btn { width: 100%; } }

@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const defaultDatabasePath = fileURLToPath(new URL('./db.json', import.meta.url));
+const defaultDatabasePath = process.env.BIDWAR_MOCK_DB || fileURLToPath(new URL('./db.json', import.meta.url));
 const defaultPort = Number(process.env.BIDWAR_MOCK_PORT || 3001);
 const MAX_AMOUNT = 2_000_000_000;
 const CONDITIONS = new Set(['new', 'used_good', 'used_fair']);
@@ -337,6 +337,45 @@ export function createMockServer({ databasePath = defaultDatabasePath } = {}) {
       }
 
       const auctionMatch = /^\/auctions\/([^/]+)$/.exec(pathname);
+      if (auctionMatch && request.method === 'PATCH') {
+        const id = parseId(auctionMatch[1]);
+        if (!id) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.', { id: 'ID harus integer positif.' });
+        const auction = database.auctions.find((entry) => Number(entry.id) === id);
+        if (!auction) return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
+        if (!isOwner(auction, currentUser)) return errorResponse(response, 403, 'FORBIDDEN', 'Hanya pemilik lelang yang dapat mengubah draft.');
+        if (auction.status !== 'draft') return errorResponse(response, 409, 'AUCTION_NOT_DRAFT', 'Hanya lelang berstatus draft yang dapat diubah.');
+        const body = await readBody(request);
+        if (!Object.keys(body).length) return errorResponse(response, 400, 'VALIDATION_ERROR', 'Perubahan draft tidak boleh kosong.', { body: 'Sertakan setidaknya satu field.' });
+        const fields = validateAuctionBody(body, true);
+        if (Object.keys(fields).length) return errorResponse(response, 400, 'VALIDATION_ERROR', 'Data lelang tidak valid.', fields);
+        for (const key of Object.keys(body)) {
+          if (key === 'productFacts') auction.productFacts = normalizeFacts(body.productFacts);
+          else if (key === 'title' || key === 'description' || key === 'imageUrl') auction[key] = body[key].trim();
+          else if (key !== 'category') auction[key] = body[key];
+        }
+        auction.currentPrice = auction.startingPrice;
+        auction.updatedAt = new Date().toISOString();
+        auction.version = Number(auction.version ?? 0) + 1;
+        await saveDatabase(databasePath, database);
+        return send(response, 200, { message: 'Draft lelang diperbarui.', data: { auction: serializeAuction(database, auction) } });
+      }
+      const startMatch = /^\/auctions\/([^/]+)\/start$/.exec(pathname);
+      if (startMatch && request.method === 'POST') {
+        const id = parseId(startMatch[1]);
+        if (!id) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.', { id: 'ID harus integer positif.' });
+        const auction = database.auctions.find((entry) => Number(entry.id) === id);
+        if (!auction) return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
+        if (!isOwner(auction, currentUser)) return errorResponse(response, 403, 'FORBIDDEN', 'Hanya pemilik lelang yang dapat memulai lelang.');
+        if (auction.status !== 'draft') return errorResponse(response, 409, 'AUCTION_NOT_DRAFT', 'Lelang sudah bukan draft dan tidak dapat dimulai ulang.');
+        const now = new Date();
+        auction.startsAt = now.toISOString();
+        auction.endsAt = new Date(now.getTime() + Number(auction.durationSeconds) * 1000).toISOString();
+        auction.status = 'live';
+        auction.updatedAt = now.toISOString();
+        auction.version = Number(auction.version ?? 0) + 1;
+        await saveDatabase(databasePath, database);
+        return send(response, 200, { message: 'Lelang dimulai.', data: { auction: serializeAuction(database, auction) } });
+      }
       if (auctionMatch && request.method === 'GET') {
         const id = parseId(auctionMatch[1]);
         if (!id) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.', { id: 'ID harus integer positif.' });
@@ -393,10 +432,10 @@ export function createMockServer({ databasePath = defaultDatabasePath } = {}) {
         return send(response, 200, { message: 'Riwayat AI berhasil diambil.', data: page.data, meta: page.meta });
       }
 
-      if (/^\/auctions\/[^/]+\/(?:bids|ai\/questions|start)$/.test(pathname) && request.method === 'POST') {
+      if (/^\/auctions\/[^/]+\/(?:bids|ai\/questions)$/.test(pathname) && request.method === 'POST') {
         return errorResponse(response, 501, 'NOT_IMPLEMENTED', 'Aksi ini belum tersedia pada mock FE-01.');
       }
-      if (/^\/auctions\/[^/]+$/.test(pathname) && ['PATCH', 'DELETE'].includes(request.method)) {
+      if (/^\/auctions\/[^/]+$/.test(pathname) && request.method === 'DELETE') {
         return errorResponse(response, 501, 'NOT_IMPLEMENTED', 'Pengelolaan lanjutan draft belum tersedia pada mock FE-01.');
       }
 
@@ -414,7 +453,7 @@ export function startMockServer({ port = defaultPort, host = '127.0.0.1', databa
   const server = createMockServer({ databasePath });
   server.listen(port, host, () => {
     console.log(`Smart Hammer MOCK API (development only) berjalan di http://${host}:${port}`);
-    console.log('Data tersimpan lokal di mock/db.json; tidak ada backend produksi, realtime, atau AI aktif.');
+    console.log(`Data tersimpan lokal di ${databasePath}; tidak ada backend produksi, bidding, realtime, atau AI aktif.`);
   });
   return server;
 }

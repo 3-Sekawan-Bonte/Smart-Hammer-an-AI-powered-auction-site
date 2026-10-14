@@ -4,7 +4,9 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 0 — Kunci scope dan fondasi
 
-- [x] FE-01 Frontend Foundation: autentikasi Redux, proteksi route, marketplace, form draft, detail snapshot, mock API sesuai kontrak, error/loading/empty state, responsif, tes, dan build diverifikasi. Bidding/AI/realtime produksi menunggu backend fase berikutnya.
+- [x] FE-01 Frontend Foundation: autentikasi Redux, proteksi route, marketplace awal, dan kontrak mock API. Seller draft lifecycle, pagination, dan auction detail diselesaikan pada FE-03.
+- [x] FE-02 Authentication: register/login, pemulihan sesi, proteksi route, logout, dan tes tetap terverifikasi.
+- [x] FE-03 Auction UI: listing/pagination, create draft, owner-only edit draft, detail, start dengan konfirmasi, mock API lifecycle, dan validasi FE-03 terverifikasi. Lihat `FE03_IMPLEMENTATION_REPORT.md`.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
 - [ ] Siapkan frontend React + Vite + Tailwind CSS.
@@ -43,6 +45,8 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 **Checkpoint:** register/login/restore-session berfungsi dan error mengikuti kontrak.
 
 ## Phase 3 — Auction API dan lifecycle
+
+**Catatan:** implementasi endpoint development mock untuk `GET/POST /auctions`, `GET/PATCH /auctions/:id`, dan `POST /auctions/:id/start` tersedia untuk FE-03. Checklist ini tetap melacak backend produksi (database, middleware, transaksi, dan integrasi); mock tersebut tidak menyelesaikan phase ini.
 
 - [ ] Buat `POST /auctions` untuk draft.
 - [ ] Buat `GET /auctions` dengan pagination.

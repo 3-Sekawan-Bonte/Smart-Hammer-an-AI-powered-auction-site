@@ -16,7 +16,7 @@ export default function Layout() {
           <Brand />
           <nav className="nav-links" aria-label="Navigasi utama">
             <NavLink end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} to="/">Jelajahi</NavLink>
-            <NavLink className="nav-link" to="/auctions/12">Live sekarang</NavLink>
+            <NavLink className="nav-link" to="/my-auctions">Lelang saya</NavLink>
             <NavLink className="nav-link" to="/auctions/new">Jual barang</NavLink>
           </nav>
           <div className="nav-actions">
