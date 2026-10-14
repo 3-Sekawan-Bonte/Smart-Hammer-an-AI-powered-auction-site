@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "seed:demo": "sequelize-cli db:seed:all --env development"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
