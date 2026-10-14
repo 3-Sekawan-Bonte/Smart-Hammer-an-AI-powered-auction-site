@@ -10,6 +10,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] FE-04 Auction Room State Management: snapshot Redux tervalidasi, merge bid/AI deduplicated, version guard, resync state, room isolation, selectors/hooks, dan reducer tests terverifikasi. Lihat `FE04_CHANGELOG.md`.
 - [x] FE-06 Live Bidding UI + functional development mock: BidForm, BidHistory, REST submission, UUID idempotency, server-side validation, serialized local mock writes, sliding deadline, and real Socket.IO broadcasts verified. Lihat `FE06_CHANGELOG.md`; BE-05 production transaction/locking remains incomplete.
 - [x] FE-07 Countdown and Auction Results: server-time-aware local countdown, zero-time confirmation/resync, authoritative winner/no-bid banner, persistent mock closure scheduler, startup/read-time recovery, serialized bid/closure, and `auction:ended` broadcast verified. Lihat `FE07_CHANGELOG.md`; BE-06 production scheduler/transaction/locking remains incomplete.
+- [x] SPA navigation audit: internal routes use React Router, one persistent router/store/provider tree, React-handled forms, and route-driven Socket.IO room membership; nested URLs refresh through Vite fallback. Static regression checks and browser route checks documented in `SPA_NAVIGATION_FIX_CHANGELOG.md`.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
 - [ ] Siapkan frontend React + Vite + Tailwind CSS.
