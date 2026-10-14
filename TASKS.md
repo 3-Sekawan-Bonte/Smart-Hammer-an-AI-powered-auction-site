@@ -129,6 +129,10 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Kirim event Q&A ke room Socket.IO per-user yang dibuat dari JWT; broadcast commentary Auctioneer hanya ke room auction.
 - [x] Bangun AIPanel dengan status pending/completed/failed, riwayat Q&A privat, commentary publik, dan pembersihan state saat logout/pergantian akun.
 - [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, rate limit, privasi REST/Socket.IO, dan snapshot publik.
+- [x] Tambahkan Groq Browser Search untuk pertanyaan eksternal yang relevan tanpa structured output; pertanyaan listing tetap memakai jalur JSON yang ada.
+- [x] Simpan citation marker dan metadata judul/URL HTTPS dari hasil tool Groq pada AIInteraction privat; jangan masukkan sumber Q&A ke snapshot/room publik.
+- [x] Tampilkan citation sebagai tautan aman dan daftar sumber pada Product Q&A.
+- [x] Uji keputusan browse/local, citation-source mapping, pencarian gagal/ambigus, timeout panjang, privasi sumber, dan regresi AI Auctioneer.
 
 **Checkpoint:** Q&A nyata berhasil, berbasis konteks server, tersimpan, dan kegagalannya tidak menghentikan bidding.
 

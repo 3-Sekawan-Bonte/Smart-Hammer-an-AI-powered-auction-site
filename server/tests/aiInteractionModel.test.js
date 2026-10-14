@@ -17,6 +17,8 @@ describe('AIInteraction schema', () => {
     expect(attributes.question.allowNull).toBe(true);
     expect(attributes.answer.allowNull).toBe(true);
     expect(attributes.missingInformation.defaultValue).toEqual([]);
+    expect(attributes.sources.defaultValue).toEqual([]);
+    expect(attributes.sources.allowNull).toBe(false);
     expect(attributes.sourceVersion.allowNull).toBe(false);
     expect(attributes.snapshotAt.allowNull).toBe(false);
     expect(attributes.errorCode.allowNull).toBe(true);

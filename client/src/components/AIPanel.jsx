@@ -80,7 +80,7 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
       {ordered.map((item) => <article className={`ai-interaction ai-interaction-${item.status}`} key={item.id}>
         {item.kind === 'commentary' ? <p className="ai-commentary-label">✦ Komentar AI Auctioneer {item.generatedBy === 'mock' ? '· simulasi' : ''}</p> : <div className="ai-question"><span>{item.user?.username || item.askedBy?.username || 'Pengguna'}</span><time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time><p>{item.question}</p></div>}
         {item.status === 'pending' && <div className="ai-pending"><span className="ai-spinner" aria-hidden="true" />AI sedang menyiapkan jawaban…</div>}
-        {item.status === 'completed' && <div className="ai-answer"><span className="ai-answer-label">Jawaban AI {item.generatedBy === 'mock' ? '· simulasi' : ''}</span><p>{item.answer}</p>{item.missingInformation?.length > 0 && <div className="ai-missing"><strong>Belum tersedia dari penjual:</strong><ul>{item.missingInformation.map((missing) => <li key={missing}>{missingLabel(missing)}</li>)}</ul></div>}</div>}
+        {item.status === 'completed' && <div className="ai-answer"><span className="ai-answer-label">Jawaban AI {item.generatedBy === 'mock' ? '· simulasi' : ''}</span><p>{renderCitedAnswer(item.answer, item.sources)}</p>{Array.isArray(item.sources) && item.sources.some((source) => source && safeHttpsUrl(source.url)) && <div className="ai-sources"><strong>Sumber eksternal</strong><ul>{item.sources.filter((source) => source && safeHttpsUrl(source.url)).map((source) => <li key={`${source.reference}:${source.url}`}><a href={safeHttpsUrl(source.url)} target="_blank" rel="noreferrer noopener">{source.title}</a></li>)}</ul></div>}{item.missingInformation?.length > 0 && <div className="ai-missing"><strong>Belum tersedia dari penjual:</strong><ul>{item.missingInformation.map((missing) => <li key={missing}>{missingLabel(missing)}</li>)}</ul></div>}</div>}
         {item.status === 'failed' && <div className="ai-failed" role="status">{item.errorCode === 'AI_INTERRUPTED' ? 'Proses AI terhenti saat server dimulai ulang.' : 'Layanan AI belum dapat menjawab. Silakan ajukan pertanyaan baru nanti.'}</div>}
         <footer className="ai-source">Snapshot lelang v{item.sourceVersion ?? '—'} · {formatDate(item.snapshotAt)}{Number.isSafeInteger(auctionVersion) && Number(item.sourceVersion) < auctionVersion ? ' · jawaban merujuk snapshot sebelumnya' : ''}{item.updatedAt && item.status !== 'pending' ? ` · diperbarui ${formatDate(item.updatedAt)}` : ''}</footer>
       </article>)}
@@ -102,4 +102,26 @@ function formatDate(value) {
 }
 function missingLabel(value) {
   return ({ specifications: 'Spesifikasi', defects: 'Kekurangan atau kondisi', accessories: 'Aksesori', warranty: 'Garansi', authenticity: 'Keaslian produk', batteryHealth: 'Kesehatan baterai', marketPrice: 'Harga pasar' })[value] || value;
+}
+
+function safeHttpsUrl(value) {
+  if (typeof value !== 'string') return undefined;
+  try { const url = new URL(value); return url.protocol === 'https:' ? url.href : undefined; } catch (_error) { return undefined; }
+}
+
+function renderCitedAnswer(answer, sources) {
+  if (typeof answer !== 'string') return '';
+  const safeSources = Array.isArray(sources) ? sources.filter((source) => source && typeof source === 'object') : [];
+  const pattern = /【(\d+)†L\d+(?:-L\d+)?】/g;
+  const output = [];
+  let cursor = 0;
+  for (const match of answer.matchAll(pattern)) {
+    const source = safeSources.find((item) => String(item.reference) === match[1] && safeHttpsUrl(item.url));
+    if (!source) continue;
+    output.push(answer.slice(cursor, match.index));
+    output.push(<a className="ai-inline-citation" href={safeHttpsUrl(source.url)} target="_blank" rel="noreferrer noopener" key={`${match.index}-${match[1]}`}>[{match[1]}]</a>);
+    cursor = match.index + match[0].length;
+  }
+  output.push(answer.slice(cursor));
+  return output;
 }

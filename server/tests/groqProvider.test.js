@@ -6,6 +6,7 @@ const {
   GROQ_CHAT_COMPLETIONS_URL,
   DEFAULT_GROQ_MODEL,
   classifyGroqHttpFailure,
+  shouldSearchProductQuestion,
 } = require('../src/services/groqProvider');
 
 function response(content, overrides = {}) {
@@ -18,13 +19,13 @@ function response(content, overrides = {}) {
 
 describe('raw Groq provider', () => {
   test('uses the documented endpoint/model and keeps injected product facts in the request context', async () => {
-    const fetchImpl = jest.fn(async () => response('{"answer":"Belum tercatat.","missingInformation":["kapasitas baterai"]}'));
+    const fetchImpl = jest.fn(async () => response('{"answer":"Garansi belum dicantumkan.","missingInformation":["warranty"]}'));
     const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl });
     const result = await provider.answerQuestion({
-      question: 'Berapa kapasitas baterainya?',
+      question: 'Apakah seller mencantumkan garansi?',
       context: { productFacts: { specifications: null }, sourceVersion: 4 },
     });
-    expect(result).toEqual({ answer: 'Belum tercatat.', missingInformation: ['kapasitas baterai'] });
+    expect(result).toEqual({ answer: 'Garansi belum dicantumkan.', missingInformation: ['warranty'], sources: [] });
     expect(fetchImpl).toHaveBeenCalledWith(GROQ_CHAT_COMPLETIONS_URL, expect.objectContaining({
       method: 'POST',
       headers: expect.objectContaining({ Authorization: 'Bearer test-only-key' }),
@@ -38,7 +39,7 @@ describe('raw Groq provider', () => {
     expect(request).not.toHaveProperty('max_tokens');
     expect(request.response_format).toEqual({ type: 'json_object' });
     expect(request.messages[0].content).toBe(SYSTEM_PROMPT);
-    expect(request.messages[1].content).toContain('kapasitas baterainya');
+    expect(request.messages[1].content).toContain('mencantumkan garansi');
   });
 
   test('keeps a prompt-injection question as untrusted user data under fixed system instructions', async () => {
@@ -57,7 +58,7 @@ describe('raw Groq provider', () => {
     const fetchImpl = jest.fn(async () => response('{"answer":"Penawaran ketiga tercatat.","missingInformation":[]}'));
     const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl });
     await expect(provider.generateCommentary({ context: { trigger: 'bid_milestone', auction: { bidCount: 3, currentPrice: 1_200 } } }))
-      .resolves.toEqual({ answer: 'Penawaran ketiga tercatat.', missingInformation: [] });
+      .resolves.toEqual({ answer: 'Penawaran ketiga tercatat.', missingInformation: [], sources: [] });
     const messages = JSON.parse(fetchImpl.mock.calls[0][1].body).messages;
     expect(messages[0].content).toBe(AUCTIONEER_SYSTEM_PROMPT);
     expect(messages[0].content).toContain('untrusted data');
@@ -111,8 +112,88 @@ describe('raw Groq provider', () => {
     ));
     const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl });
     const result = await provider.answerQuestion({ question: 'Tanya', context: {} });
-    expect(result).toEqual({ answer: 'Fakta belum tersedia.', missingInformation: [] });
+    expect(result).toEqual({ answer: 'Fakta belum tersedia.', missingInformation: [], sources: [] });
     expect(JSON.stringify(result)).not.toContain('private chain of thought');
+  });
+
+  test('selects browser search for external product research, but not listing-specific questions', () => {
+    expect(shouldSearchProductQuestion('What is the price if this headphone is brand new?', { title: 'Sony WH-1000XM5' })).toBe(true);
+    expect(shouldSearchProductQuestion('Berapa harga resmi Sony WH-1000XM5?', { title: 'Sony WH-1000XM5' })).toBe(true);
+    expect(shouldSearchProductQuestion('Berapa kapasitas baterainya?', { title: 'Sony WH-1000XM5', productFacts: { specifications: null } })).toBe(true);
+    expect(shouldSearchProductQuestion('Apakah aksesori disertakan oleh penjual?', { title: 'Sony WH-1000XM5' })).toBe(false);
+    expect(shouldSearchProductQuestion('Apakah unit lelang ini benar-benar baru?', { title: 'Sony WH-1000XM5' })).toBe(false);
+    expect(shouldSearchProductQuestion('What is the current price in this auction?', { title: 'Sony WH-1000XM5' })).toBe(false);
+    expect(shouldSearchProductQuestion('What is the release date?', {})).toBe(false);
+  });
+
+  test('uses browser search without structured output and preserves citations with verified source metadata', async () => {
+    const content = 'Harga baru berkisar Rp5–6 juta, dan harga berbeda menurut penjual dan tanggal【1†L26-L30】【3†L4-L6】.';
+    const fetchImpl = jest.fn(async () => ({
+      ok: true,
+      async json() { return { choices: [{ message: {
+        content,
+        executed_tools: [
+          { name: 'browser.search', type: 'browser_search' },
+          { name: 'browser.open', type: 'browser.open', search_results: { results: [{
+            title: 'Sony WH-1000XM5 — Sony Indonesia', url: 'https://www.sony.co.id/products/wh-1000xm5',
+          }] } },
+          { name: 'browser.search', type: 'browser_search' },
+          { name: 'browser.open', type: 'browser.open', search_results: { results: [{
+            title: 'Sony WH-1000XM5 — MDP', url: 'https://www.mdp.co.id/product/wh-1000xm5',
+          }] } },
+        ],
+      } }] }; },
+    }));
+    const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl });
+    const result = await provider.answerQuestion({ question: 'Harga headphone ini kalau baru berapa?', context: { title: 'Sony WH-1000XM5' } });
+    expect(result).toEqual({ answer: content, missingInformation: [], sources: [
+      { reference: '1', title: 'Sony WH-1000XM5 — Sony Indonesia', url: 'https://www.sony.co.id/products/wh-1000xm5' },
+      { reference: '3', title: 'Sony WH-1000XM5 — MDP', url: 'https://www.mdp.co.id/product/wh-1000xm5' },
+    ] });
+    const request = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    expect(request.tools).toEqual([{ type: 'browser_search' }]);
+    expect(request.tool_choice).toBe('required');
+    expect(request).not.toHaveProperty('response_format');
+    expect(request).not.toHaveProperty('citation_options');
+    expect(request.signal).toBeUndefined();
+    expect(fetchImpl.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(fetchImpl.mock.calls[0][1].signal.aborted).toBe(false);
+  });
+
+  test('gives browser search a bounded 45-second timeout', async () => {
+    const timeoutSpy = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
+    try {
+      const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl: async () => ({
+        ok: true,
+        async json() { return { choices: [{ message: { content: 'Tanggal rilis tersedia【1†L1-L2】.', executed_tools: [
+          { name: 'browser.search' },
+          { name: 'browser.open', search_results: { results: [{ title: 'Manufacturer', url: 'https://manufacturer.example.test/product' }] } },
+        ] } }] }; },
+      }) });
+      await provider.answerQuestion({ question: 'What is the release date?', context: { title: 'Exact product model' } });
+      expect(timeoutSpy).toHaveBeenCalledWith(45_000);
+    } finally { timeoutSpy.mockRestore(); }
+  });
+
+  test('rejects browser answers whose citations cannot be resolved to Groq source URLs', async () => {
+    const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl: async () => ({
+      ok: true,
+      async json() { return { choices: [{ message: { content: 'Harga sekitar Rp5 juta【1†L1-L3】.', executed_tools: [{ name: 'browser.search' }] } }] }; },
+    }) });
+    await expect(provider.answerQuestion({ question: 'Harga brand new?', context: { title: 'Sony WH-1000XM5' } }))
+      .rejects.toMatchObject({ code: 'AI_INVALID_RESPONSE' });
+  });
+
+  test('rejects a retail-price answer that cites fewer than two independent source domains', async () => {
+    const provider = createGroqProvider({ env: { GROQ_API_KEY: 'test-only-key' }, fetchImpl: async () => ({
+      ok: true,
+      async json() { return { choices: [{ message: { content: 'Harga sekitar Rp5 juta【1†L1-L3】.', executed_tools: [
+        { name: 'browser.search' },
+        { name: 'browser.open', search_results: { results: [{ title: 'Retail', url: 'https://shop.example.test/item' }] } },
+      ] } }] }; },
+    }) });
+    await expect(provider.answerQuestion({ question: 'Berapa harga baru?', context: { title: 'Sony WH-1000XM5' } }))
+      .rejects.toMatchObject({ code: 'AI_INVALID_RESPONSE' });
   });
 
   test.each([

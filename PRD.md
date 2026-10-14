@@ -17,14 +17,14 @@ Setiap registered user dapat bertindak sebagai seller pada lelangnya sendiri dan
 - Membuat draft lelang.
 - Mengedit draft miliknya.
 - Memulai draft miliknya.
-- Melihat bid, Q&A, dan hasil lelang.
+- Melihat bid, komentar AI Auctioneer publik, Q&A miliknya sendiri, dan hasil lelang.
 
 **Buyer/peserta dapat:**
 - Melihat lelang yang tersedia.
 - Bergabung ke room lelang.
 - Melihat informasi dan riwayat bid.
 - Mengajukan bid valid.
-- Bertanya kepada AI dan melihat interaksi AI publik di room.
+- Mengajukan Q&A produk privat miliknya sendiri dan melihat komentar AI Auctioneer publik.
 
 **Batasan:** seller tidak boleh menawar lelangnya sendiri. Akses dan kepemilikan harus diverifikasi backend, bukan hanya disembunyikan pada UI.
 
@@ -37,7 +37,7 @@ Register/login → membuat draft → mengisi informasi barang dan harga → memu
 Register/login → melihat daftar lelang → membuka detail → bertanya kepada AI atau mengajukan bid → mengikuti harga/riwayat secara langsung → melihat hasil.
 
 ### Product Q&A
-Buyer mengirim pertanyaan → backend mengambil fakta produk dan snapshot lelang → AI menghasilkan jawaban → interaksi disimpan → jawaban disebarkan ke room. Jika informasi tidak tercatat, AI harus menyatakan bahwa informasi tersebut belum tersedia dan perlu dikonfirmasi kepada seller.
+User mengirim pertanyaan → backend mengambil fakta produk dan snapshot lelang → menyimpan interaksi `pending` privat → AI menjawab dari data listing atau menggunakan Groq Browser Search untuk pertanyaan eksternal yang relevan → jawaban, status, dan sumber terverifikasi disimpan → hasil dikirim hanya ke user pemilik. Jika fakta listing tidak tersedia, AI harus menyatakan bahwa informasi tersebut belum tersedia dan perlu dikonfirmasi kepada seller. AI Auctioneer tetap publik.
 
 ## 4. Persyaratan fungsional
 
@@ -88,7 +88,7 @@ Jika `newEndsAt` lebih besar daripada `currentEndsAt`, deadline diperbarui. Semu
 
 ### FR-06 — Live updates dan recovery
 - Peserta bergabung ke Socket.IO room berdasarkan `auctionId`.
-- Harga, bid baru, waktu akhir, status mulai/selesai, dan interaksi AI disebarkan ke peserta room yang sesuai.
+- Harga, bid baru, waktu akhir, status mulai/selesai, dan komentar AI Auctioneer disebarkan ke room lelang; event Q&A privat hanya dikirim ke room user pemilik.
 - Snapshot menyertakan `version` dan waktu server.
 - Frontend mengabaikan event state yang lebih lama, menghindari duplikasi berdasarkan ID, dan melakukan resync jika ada celah versi.
 - Refresh/reconnect memuat snapshot terbaru dari backend/database.
@@ -97,13 +97,18 @@ Jika `newEndsAt` lebih besar daripada `currentEndsAt`, deadline diperbarui. Semu
 ### FR-07 — AI Product Q&A
 - User dapat mengirim pertanyaan tentang produk dalam lelang `live` atau `ended`.
 - Backend menyimpan interaksi sebagai `pending`, lalu memperbaruinya menjadi `completed` atau `failed`.
-- Jawaban ditampilkan kepada semua peserta sebagai interaksi publik.
+- Interaksi pertanyaan, jawaban, dan sumber hanya dapat dilihat user pemilik; komentar AI Auctioneer tetap publik.
+- Sumber eksternal harus berasal dari citation metadata tool Groq, menggunakan URL HTTPS; harga baru perlu sedikitnya dua domain independen, jika tidak AI tidak memberi angka harga.
 - AI menggunakan fakta produk dari seller dan snapshot lelang yang diambil server.
+- Pertanyaan yang memerlukan harga ritel, spesifikasi eksternal, informasi resmi, ketersediaan, tanggal rilis, atau ulasan boleh menggunakan Groq Browser Search (`openai/gpt-oss-120b`).
+- Untuk klaim eksternal, tampilkan citation marker yang terhubung ke sumber HTTPS dari metadata Groq; jangan membuat URL/citation sendiri. Harga ritel baru harus dibedakan dari harga atau kondisi item lelang dan dinyatakan dapat berubah menurut penjual/tanggal.
+- Browser Search menggunakan plain-text completion tanpa `response_format`; Q&A tanpa pencarian tetap memakai kontrak terstruktur `answer` dan `missingInformation`.
 - AI harus mengakui jika informasi tidak tersedia.
-- AI tidak boleh mengarang spesifikasi, garansi, keaslian, kondisi, kelengkapan, atau harga pasar.
+- AI tidak boleh mengarang spesifikasi, garansi, keaslian, kondisi, kelengkapan, atau harga pasar; informasi pasar dari web harus diberi sumber dan tidak membuktikan kondisi item lelang.
 - AI tidak menentukan harga, validitas bid, pemenang, atau lifecycle lelang.
 - Kegagalan AI tidak boleh menghentikan bidding.
 - Q&A diberi rate limit awal satu pertanyaan per user setiap 10 detik.
+- Pertanyaan yang meminta harga ritel baru harus menyertakan sumber independen setidaknya dari dua domain sebelum memberikan harga/rentang; bila tidak, AI menyatakan harga tidak dapat diverifikasi.
 
 ### FR-08 — AI Auctioneer
 - AI membuat komentar pembukaan, komentar pada **setiap bid ke-3** (bid ke-3, ke-6, ke-9, dst.), dan komentar akhir.
@@ -154,4 +159,4 @@ Format tampilan harga: `Rp 1.500.000` (locale Indonesia dengan pemisah titik). B
 
 ## 8. Di luar scope
 
-AI summary, notifikasi tersimpan, presence, pencarian/filter lanjutan, dashboard riwayat, upload gambar, watchlist, grafik bid, AI Bid Coach, price advisor, fraud flags, private chat, voice, payment/wallet, auto-bid, Redis dan multi-server ditunda sampai alur inti stabil.
+AI summary, notifikasi tersimpan, presence, pencarian/filter lanjutan, dashboard riwayat, upload gambar, watchlist, grafik bid, AI Bid Coach, price advisor umum, fraud flags, private chat, voice, payment/wallet, auto-bid, Redis dan multi-server ditunda sampai alur inti stabil. Product Q&A boleh menjawab pertanyaan produk spesifik dengan harga ritel web yang disumberkan; ini bukan rekomendasi harga lelang.
