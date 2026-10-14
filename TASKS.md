@@ -117,13 +117,14 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 8 — AI Auctioneer
 
-- [ ] Tambahkan komentar saat auction mulai.
-- [ ] Tambahkan trigger milestone bid dengan cooldown, bukan pada setiap bid.
-- [ ] Tambahkan komentar saat auction berakhir.
-- [ ] Backend menghitung metrik; AI hanya menyusun komentar.
-- [ ] Batasi satu komentar AI berjalan per room dan tangani response usang melalui snapshot metadata.
-- [ ] Pastikan proses AI tidak menahan transaksi bid atau closure.
-- [ ] Tampilkan komentar sebagai interaksi AI publik.
+- [x] Tambahkan komentar saat auction mulai.
+- [x] Tambahkan trigger milestone bid pada setiap bid ke-3 dan batasi commentary yang berjalan bersamaan per room/global.
+- [x] Tambahkan komentar saat auction berakhir.
+- [x] Backend menghitung metrik; AI hanya menyusun komentar.
+- [x] Batasi satu komentar AI berjalan per room dan tandai snapshot sumber melalui metadata version.
+- [x] Pastikan proses AI tidak menahan transaksi bid atau closure.
+- [x] Tampilkan komentar sebagai interaksi AI publik.
+- [x] Tambahkan tests untuk trigger start, milestone 3/6, closure, retry/rollback, provider failure, deduplikasi, dan event payload.
 
 **Checkpoint:** komentar AI muncul untuk event penting tanpa mengontrol aturan atau menunda bidding.
 

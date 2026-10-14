@@ -1,6 +1,6 @@
 const { createBidService } = require('../src/services/bidService');
 
-function setup(overrides = {}, eventPublisher, failCommit = false) {
+function setup(overrides = {}, eventPublisher, failCommit = false, initialBidCount = 0, auctioneer) {
   const auction = {
     id: 8,
     sellerId: 2,
@@ -20,12 +20,20 @@ function setup(overrides = {}, eventPublisher, failCommit = false) {
     },
   };
   const transaction = { LOCK: { UPDATE: 'UPDATE' } };
-  const bids = [];
+  const bids = Array.from({ length: initialBidCount }, (_, index) => ({
+    id: index + 1,
+    auctionId: auction.id,
+    userId: index + 20,
+    amount: 1_000 + (index * 100),
+    clientRequestId: `existing-${index}`,
+    createdAt: new Date(Date.now() - (initialBidCount - index) * 1000),
+  }));
   const Auction = {
     async findByPk(_id, options) { expect(options).toMatchObject({ transaction, lock: 'UPDATE' }); return auction; },
   };
   const Bid = {
     async findOne({ where }) { return bids.find((bid) => bid.userId === where.userId && bid.clientRequestId === where.clientRequestId) || null; },
+    async count({ where, transaction: countTransaction }) { expect(where).toEqual({ auctionId: auction.id }); expect(countTransaction).toBe(transaction); return bids.length; },
     async create(values, options) {
       expect(options).toEqual({ transaction });
       const bid = { id: bids.length + 1, ...values };
@@ -33,8 +41,8 @@ function setup(overrides = {}, eventPublisher, failCommit = false) {
       return bid;
     },
   };
-  const sequelize = { async transaction(callback) { const result = await callback(transaction); if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
-  return { service: createBidService({ Auction, Bid, sequelize, eventPublisher }), auction, bids };
+  const sequelize = { async transaction(callback) { const result = await callback(transaction); this.committed = true; if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
+  return { service: createBidService({ Auction, Bid, sequelize, eventPublisher, auctioneer }), auction, bids, sequelize };
 }
 
 const input = { amount: 1_000, clientRequestId: '550e8400-e29b-41d4-a716-446655440000' };
@@ -73,6 +81,41 @@ describe('bid service state rules', () => {
     const state = setup({}, publisher, true);
     await expect(state.service.place(4, 8, input)).rejects.toThrow('commit failed');
     expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  test.each([[2, 3], [5, 6]])('triggers commentary after the %i prior bids when the accepted bid is number %i', async (priorCount, bidCount) => {
+    const auctioneer = { trigger: jest.fn(function trigger() { expect(state.sequelize.committed).toBe(true); }) };
+    const state = setup({ currentPrice: 1_000 + (priorCount * 100), highestBidderId: 19 }, null, false, priorCount, auctioneer);
+    await state.service.place(4, state.auction.id, { ...input, amount: state.auction.currentPrice + 100 });
+    expect(auctioneer.trigger).toHaveBeenCalledWith(expect.objectContaining({
+      auction: state.auction,
+      trigger: 'bid_milestone',
+      triggerData: expect.objectContaining({ bidCount }),
+    }));
+  });
+
+  test('does not trigger commentary for a non-milestone, idempotent retry, rejected bid, or failed commit', async () => {
+    const auctioneer = { trigger: jest.fn() };
+    const nonMilestone = setup({}, null, false, 1, auctioneer);
+    await nonMilestone.service.place(4, nonMilestone.auction.id, input);
+    expect(auctioneer.trigger).not.toHaveBeenCalled();
+
+    const replay = setup({ status: 'ended' }, null, false, 2, auctioneer);
+    replay.bids.push({ id: 99, auctionId: replay.auction.id, userId: 4, ...input, createdAt: new Date() });
+    await replay.service.place(4, replay.auction.id, input);
+    expect(auctioneer.trigger).not.toHaveBeenCalled();
+
+    const rejected = setup({ status: 'draft' }, null, false, 2, auctioneer);
+    await expect(rejected.service.place(4, rejected.auction.id, input)).rejects.toMatchObject({ code: 'AUCTION_NOT_LIVE' });
+    const failed = setup({}, null, true, 2, auctioneer);
+    await expect(failed.service.place(4, failed.auction.id, input)).rejects.toThrow('commit failed');
+    expect(auctioneer.trigger).not.toHaveBeenCalled();
+  });
+
+  test('keeps a committed accepted bid successful when socket delivery throws', async () => {
+    const state = setup({}, { publish: jest.fn(() => { throw new Error('socket down'); }) });
+    await expect(state.service.place(4, state.auction.id, input)).resolves.toMatchObject({ replayed: false });
+    expect(state.bids).toHaveLength(1);
   });
 
   test('rejects idempotency conflicts, missing/live/deadline/self-bid, minimum and price-limit violations', async () => {

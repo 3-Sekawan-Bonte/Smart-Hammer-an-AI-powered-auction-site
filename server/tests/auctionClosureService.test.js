@@ -1,7 +1,7 @@
 const { createAuctionClosureService } = require('../src/services/auctionClosureService');
 const { auctionToJSON } = require('../src/utils/auctionSerializer');
 
-function setup({ auction: overrides = {}, lastBid = null, clock = () => new Date('2026-10-14T12:00:00.000Z'), eventPublisher, failCommit = false } = {}) {
+function setup({ auction: overrides = {}, lastBid = null, clock = () => new Date('2026-10-14T12:00:00.000Z'), eventPublisher, auctioneer, failCommit = false } = {}) {
   const auction = {
     id: 12,
     status: 'live',
@@ -31,9 +31,10 @@ function setup({ auction: overrides = {}, lastBid = null, clock = () => new Date
       expect(options.order).toEqual([['createdAt', 'DESC'], ['id', 'DESC']]);
       return lastBid;
     }),
+    count: jest.fn(async (options) => { expect(options).toMatchObject({ where: { auctionId: auction.id }, transaction }); return lastBid ? 1 : 0; }),
   };
-  const sequelize = { async transaction(callback) { const result = await callback(transaction); if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
-  return { service: createAuctionClosureService({ Auction, Bid, sequelize, clock, eventPublisher }), auction, Auction, Bid, sequelize };
+  const sequelize = { async transaction(callback) { const result = await callback(transaction); this.committed = true; if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
+  return { service: createAuctionClosureService({ Auction, Bid, sequelize, clock, eventPublisher, auctioneer }), auction, Auction, Bid, sequelize };
 }
 
 describe('auction closure service', () => {
@@ -72,6 +73,30 @@ describe('auction closure service', () => {
     const state = setup({ lastBid: { amount: 1_500, userId: 4 }, eventPublisher: publisher, failCommit: true });
     await expect(state.service.close(12)).rejects.toThrow('commit failed');
     expect(publisher.publish).not.toHaveBeenCalled();
+  });
+
+  test('triggers closing commentary only after a successful first close', async () => {
+    const auctioneer = { trigger: jest.fn(function trigger() { expect(state.sequelize.committed).toBe(true); }) };
+    const state = setup({ lastBid: { amount: 1_500, userId: 4 }, auctioneer });
+    await state.service.close(state.auction.id);
+    expect(auctioneer.trigger).toHaveBeenCalledWith(expect.objectContaining({
+      auction: state.auction,
+      trigger: 'end',
+      triggerData: { bidCount: 1 },
+    }));
+    auctioneer.trigger.mockClear();
+    await state.service.close(state.auction.id);
+    expect(auctioneer.trigger).not.toHaveBeenCalled();
+
+    const rolledBack = setup({ lastBid: { amount: 1_500, userId: 4 }, auctioneer, failCommit: true });
+    await expect(rolledBack.service.close(rolledBack.auction.id)).rejects.toThrow('commit failed');
+    expect(auctioneer.trigger).not.toHaveBeenCalled();
+  });
+
+  test('keeps a committed closure successful when socket delivery throws', async () => {
+    const state = setup({ eventPublisher: { publish: jest.fn(() => { throw new Error('socket down'); }) } });
+    await expect(state.service.close(state.auction.id)).resolves.toMatchObject({ closed: true });
+    expect(state.auction.status).toBe('ended');
   });
 
   test.each([

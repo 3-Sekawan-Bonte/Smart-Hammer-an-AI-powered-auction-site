@@ -20,5 +20,7 @@ describe('AIInteraction schema', () => {
     expect(attributes.snapshotAt.allowNull).toBe(false);
     expect(attributes.errorCode.allowNull).toBe(true);
     expect(AIInteraction.options.indexes.map(({ name }) => name)).toContain('ai_interactions_auction_visibility_created_id_idx');
+    expect(attributes.triggerKey.allowNull).toBe(true);
+    expect(AIInteraction.options.indexes.map(({ name }) => name)).toContain('ai_interactions_commentary_trigger_unique_idx');
   });
 });

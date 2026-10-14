@@ -26,7 +26,7 @@ function isUniqueViolation(error) {
   return error?.name === 'SequelizeUniqueConstraintError' || error?.original?.code === '23505';
 }
 
-function createBidService({ Auction, Bid, User, sequelize, eventPublisher }) {
+function createBidService({ Auction, Bid, User, sequelize, eventPublisher, auctioneer }) {
   const auctionIncludes = User ? [
     { model: User, as: 'seller', attributes: ['id', 'username'], required: false },
     { model: User, as: 'highestBidder', attributes: ['id', 'username'], required: false },
@@ -87,9 +87,23 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher }) {
         const updatedAuction = User
           ? await Auction.findByPk(auctionId, { transaction, include: auctionIncludes })
           : auction;
-        return { bid: serializeBid(bid), replayed: false, auction: updatedAuction };
+        const bidCount = auctioneer && typeof Bid.count === 'function'
+          ? await Bid.count({ where: { auctionId }, transaction })
+          : null;
+        return { bid: serializeBid(bid), replayed: false, auction: updatedAuction, bidCount };
       });
-      if (!result.replayed) eventPublisher?.publish('bid:updated', result.auction, { bid: result.bid });
+      if (!result.replayed) {
+        try { eventPublisher?.publish('bid:updated', result.auction, { bid: result.bid }); } catch (_error) { /* Socket delivery cannot undo an accepted bid. */ }
+        if (result.bidCount && result.bidCount % 3 === 0) {
+          try {
+            auctioneer?.trigger({
+              auction: result.auction,
+              trigger: 'bid_milestone',
+              triggerData: { bidCount: result.bidCount, acceptedBid: result.bid },
+            });
+          } catch (_error) { /* Commentary never changes bid acceptance. */ }
+        }
+      }
       return result;
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
