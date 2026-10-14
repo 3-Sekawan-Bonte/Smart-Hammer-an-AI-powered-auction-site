@@ -127,7 +127,7 @@ export default function CreateAuctionPage({ mode = 'create' }) {
               <li><i className="check">✓</i><span>Jelaskan kondisi dan kekurangan dengan jujur.</span></li>
               <li><i className="check">✓</i><span>Lengkapi spesifikasi dan aksesori yang tersedia.</span></li>
               <li><i className="check">✓</i><span>Gunakan harga integer dalam rupiah.</span></li>
-              <li><i className="check">✓</i><span>Kategori ditetapkan otomatis sebagai electronics.</span></li>
+              <li><i className="check">✓</i><span>Kategori produk mengikuti pilihan yang tersedia.</span></li>
               <li><i className="check">✓</i><span>Draft tidak tampil di marketplace publik.</span></li>
             </ul>
             {isEdit && auction?.status !== 'draft' && <p className="side-note">Lelang sudah dimulai atau berakhir. Data form dipertahankan, tetapi tidak dapat disimpan.</p>}

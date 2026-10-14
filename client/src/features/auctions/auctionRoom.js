@@ -22,7 +22,7 @@ export function validateSnapshot(snapshot, requestedId) {
     ...snapshot,
     auction: { ...auction, version: Number(auction.version) },
     bids: snapshot.bids || [],
-    aiInteractions: (snapshot.aiInteractions || []).filter((item) => item?.visibility === 'public'),
+    aiInteractions: (snapshot.aiInteractions || []).filter((item) => item?.kind === 'commentary' && item?.visibility === 'public'),
   };
 }
 
@@ -47,10 +47,10 @@ export function mergeBids(existing = [], incoming = [], auctionId) {
 
 export function mergePublicInteractions(existing = [], incoming = [], auctionId) {
   const byId = new Map(existing
-    .filter((item) => item?.id != null && sameId(item.auctionId, auctionId) && item.visibility === 'public')
+    .filter((item) => item?.id != null && sameId(item.auctionId, auctionId) && item.kind === 'commentary' && item.visibility === 'public')
     .map((item) => [String(item.id), item]));
   for (const item of incoming) {
-    if (!item || item.id == null || !sameId(item.auctionId, auctionId) || item.visibility !== 'public') continue;
+    if (!item || item.id == null || !sameId(item.auctionId, auctionId) || item.kind !== 'commentary' || item.visibility !== 'public') continue;
     const previous = byId.get(String(item.id));
     if (!previous) { byId.set(String(item.id), item); continue; }
     const oldTime = Date.parse(previous.updatedAt || previous.createdAt || '') || 0;
@@ -79,3 +79,28 @@ export function isValidEvent(payload, activeId) {
   return true;
 }
 
+// Server events share a metadata envelope but place event data under `data`.
+// Normalize that contract once before Redux reducers validate or merge it.
+export function normalizeSocketEvent(payload = {}) {
+  const data = payload.data && typeof payload.data === 'object' ? payload.data : {};
+  const normalized = { ...payload, ...data };
+  if (data.interaction) normalized.interaction = data.interaction;
+  if (data.auction) normalized.auction = data.auction;
+  if (data.bid) normalized.bid = data.bid;
+  if (Array.isArray(data.bids)) normalized.bids = data.bids;
+  if (Array.isArray(data.aiInteractions)) normalized.aiInteractions = data.aiInteractions;
+  const pageMeta = (meta) => meta && ({
+    currentPage: meta.page ?? meta.currentPage ?? 1,
+    limit: meta.limit ?? 10,
+    totalData: meta.total ?? meta.totalData ?? 0,
+    totalPages: meta.totalPages ?? 0,
+  });
+  const bidsMeta = pageMeta(data.bidsMeta || data.meta);
+  const aiMeta = pageMeta(data.aiMeta);
+  if (bidsMeta) normalized.bidsMeta = bidsMeta;
+  if (aiMeta) normalized.aiMeta = aiMeta;
+  if (normalized.interaction && normalized.interaction.auctionId == null && normalized.auctionId != null) {
+    normalized.interaction = { ...normalized.interaction, auctionId: normalized.auctionId };
+  }
+  return normalized;
+}

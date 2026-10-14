@@ -27,8 +27,8 @@ const bidEvent = (version, id = 101, idAuction = 12) => ({
 
 test('snapshot handles empty histories, public AI filtering, metadata, and server clock', () => {
   let state = reducer(undefined, auctionSnapshotReceived({ ...snapshot(), aiInteractions: [
-    { id: 1, auctionId: 12, visibility: 'public', status: 'completed' },
-    { id: 2, auctionId: 12, visibility: 'private', status: 'completed' },
+    { id: 1, auctionId: 12, kind: 'commentary', visibility: 'public', status: 'completed' },
+    { id: 2, auctionId: 12, kind: 'question', visibility: 'private', status: 'completed' },
   ] }));
   assert.deepEqual(state.active.bids, []);
   assert.deepEqual(state.active.publicAIInteractions.map((item) => item.id), [1]);
@@ -127,15 +127,31 @@ test('history resync merges old pages and updates duplicate records newest-first
 
 test('AI interactions deduplicate, advance pending to terminal, and ignore late pending/private updates', () => {
   let state = reducer(undefined, auctionSnapshotReceived(snapshot(12, 8)));
-  const pending = { id: 5, auctionId: 12, visibility: 'public', status: 'pending', sourceVersion: 6, snapshotAt: '2026-10-14T00:00:00Z', createdAt: '2026-10-14T00:00:00Z', updatedAt: '2026-10-14T00:00:00Z' };
-  state = reducer(state, aiPending(pending));
+  const pending = { id: 5, auctionId: 12, userId: 7, kind: 'question', visibility: 'private', status: 'pending', sourceVersion: 6, snapshotAt: '2026-10-14T00:00:00Z', createdAt: '2026-10-14T00:00:00Z', updatedAt: '2026-10-14T00:00:00Z' };
+  state = reducer(state, aiPending({ interaction: pending, authenticatedUserId: 7 }));
   state = reducer(state, aiReceived({ ...pending, status: 'completed', answer: 'OK', missingInformation: [], updatedAt: '2026-10-14T00:00:02Z' }));
-  state = reducer(state, aiPending({ ...pending, updatedAt: '2026-10-14T00:00:03Z' }));
-  state = reducer(state, aiFailed({ ...pending, visibility: 'private', status: 'failed', errorCode: 'AI_UNAVAILABLE' }));
-  assert.equal(state.active.publicAIInteractions.length, 1);
-  assert.equal(state.active.publicAIInteractions[0].status, 'completed');
-  assert.equal(state.active.publicAIInteractions[0].sourceVersion, 6);
-  assert.equal(state.active.publicAIInteractions[0].snapshotAt, '2026-10-14T00:00:00Z');
+  state = reducer(state, aiPending({ interaction: { ...pending, updatedAt: '2026-10-14T00:00:03Z' }, authenticatedUserId: 7 }));
+  state = reducer(state, aiFailed({ interaction: { ...pending, status: 'failed', errorCode: 'AI_UNAVAILABLE' }, authenticatedUserId: 7 }));
+  assert.equal(state.active.publicAIInteractions.length, 0);
+  assert.equal(state.active.privateAIInteractions.length, 1);
+  assert.equal(state.active.privateAIInteractions[0].status, 'completed');
+  assert.equal(state.active.privateAIInteractions[0].sourceVersion, 6);
+  assert.equal(state.active.privateAIInteractions[0].snapshotAt, '2026-10-14T00:00:00Z');
+});
+
+test('private Q&A state is owner-bound and cleared on logout or account switch', () => {
+  let state = reducer(undefined, auctionSnapshotReceived(snapshot()));
+  const privateInteraction = { id: 5, auctionId: 12, userId: 7, kind: 'question', visibility: 'private', status: 'completed' };
+  state = reducer(state, aiReceived({ interaction: privateInteraction, authenticatedUserId: 7 }));
+  assert.equal(state.active.privateAIInteractions.length, 1);
+  state = reducer(state, aiReceived({ interaction: { ...privateInteraction, id: 6, userId: 8 }, authenticatedUserId: 7 }));
+  assert.equal(state.active.privateAIInteractions.length, 1);
+  state = reducer(state, { type: 'auth/login/fulfilled', payload: { user: { id: 8 } } });
+  assert.deepEqual(state.active.privateAIInteractions, []);
+  state = reducer(state, aiReceived({ interaction: privateInteraction, authenticatedUserId: 8 }));
+  assert.deepEqual(state.active.privateAIInteractions, []);
+  state = reducer(state, { type: 'auth/logout' });
+  assert.deepEqual(state.active.privateAIInteractions, []);
 });
 
 test('room isolation, equal-version conflicts, resync flags, and ended lifecycle are protected', () => {

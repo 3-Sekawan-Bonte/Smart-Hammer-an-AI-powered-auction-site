@@ -34,6 +34,12 @@ Authenticated users can browse public live and ended auctions, view auction deta
 
 The mock supports authentication, auction listing/details, draft creation/editing, and draft start. It deliberately does not implement bidding or AI questions. Socket.IO is not used to claim realtime state. The mock is for local development and is not production persistence or authorization infrastructure.
 
+## Backend AI provider
+
+Product Q&A and AI Auctioneer use Groq Chat Completions with `openai/gpt-oss-120b`. For backend development, copy `server/.env.example` to `server/.env`, configure the database and JWT settings, and set `GROQ_API_KEY` in that server-only file. `GROQ_MODEL` defaults to `openai/gpt-oss-120b`. Never place the key in `client/.env*` or a `VITE_*` variable. Start the backend from `server/` with `npm start`; AI provider tests use mocks and do not require a live key.
+
+To use Groq locally, create a key in your Groq account and add it to `server/.env` as `GROQ_API_KEY=<your-key>`. The server sends raw HTTP requests to `https://api.groq.com/openai/v1/chat/completions` with medium reasoning effort and validates the JSON response before saving or broadcasting it. No Groq SDK is required. Do not share or commit the key. Live provider behavior has not been verified by the automated tests.
+
 ## FE-03 routes and API
 
 - `/` — public auction catalog from `GET /auctions`, including response pagination metadata.

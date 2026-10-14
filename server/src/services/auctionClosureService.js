@@ -36,6 +36,8 @@ function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = ()
       const updatedAuction = User
         ? await Auction.findByPk(auctionId, { transaction, include: auctionIncludes })
         : auction;
+      if (typeof updatedAuction.setDataValue === 'function') updatedAuction.setDataValue('bidCount', bidCount);
+      else updatedAuction.bidCount = bidCount;
       return { closed: true, auction: updatedAuction, finalPrice: hasBids ? auction.currentPrice : null, bidCount };
     });
     if (result.closed) {
@@ -43,6 +45,7 @@ function createAuctionClosureService({ Auction, Bid, User, sequelize, clock = ()
         eventPublisher?.publish('auction:ended', result.auction, {
           winner: result.auction.winner ? { id: result.auction.winner.id, username: result.auction.winner.username } : null,
           finalPrice: result.finalPrice,
+          bidCount: result.bidCount,
         });
       } catch (_error) { /* Socket delivery cannot undo committed closure. */ }
       try { auctioneer?.trigger({ auction: result.auction, trigger: 'end', triggerData: { bidCount: result.bidCount } }); } catch (_error) { /* Commentary never changes closure success. */ }

@@ -229,3 +229,19 @@ describe('POST /auctions/:id/bids', () => {
     expect(updated.version).toBe(concurrentAuction.version + 1);
   });
 });
+
+describe('GET /auctions/:id/bids', () => {
+  test('returns paginated public bid history without idempotency keys', async () => {
+    const auction = await createAuction();
+    const first = bidBody();
+    await submit(auction.id, first).expect(201);
+    await submit(auction.id, bidBody({ amount: 1_100 })).expect(201);
+    const response = await request(app).get(`/auctions/${auction.id}/bids?page=1&limit=1`).set(auth()).expect(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0]).toMatchObject({ auctionId: auction.id, userId: bidder.id, amount: 1_100, bidder: { id: bidder.id, username: bidder.username } });
+    expect(response.body.data[0]).not.toHaveProperty('clientRequestId');
+    expect(response.body.meta).toEqual({ page: 1, limit: 1, total: 2, totalPages: 2 });
+    await request(app).get(`/auctions/${auction.id}/bids?limit=0`).set(auth()).expect(400);
+    await request(app).get(`/auctions/${auction.id}/bids`).expect(401);
+  });
+});

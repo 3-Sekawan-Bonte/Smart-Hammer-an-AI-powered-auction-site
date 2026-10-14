@@ -2,6 +2,7 @@ const { Server } = require('socket.io');
 const { verifyAccessToken } = require('../utils/verifyAccessToken');
 const { createAuctionService } = require('../services/auctionService');
 const { auctionToJSON } = require('../utils/auctionSerializer');
+const { interactionToJSON } = require('../services/aiInteractionService');
 
 function ackError(ack, code, message) {
   if (typeof ack === 'function') ack({ ok: false, error: { code, message } });
@@ -14,7 +15,7 @@ function validPayload(payload) {
 }
 
 function createSocketServer(httpServer, dependencies, options = {}) {
-  const { User, Auction, Bid } = dependencies;
+  const { User, Auction, Bid, AIInteraction } = dependencies;
   const io = new Server(httpServer, options);
   const auctionService = createAuctionService(dependencies);
 
@@ -33,6 +34,7 @@ function createSocketServer(httpServer, dependencies, options = {}) {
   });
 
   io.on('connection', (socket) => {
+    socket.join(`user:${socket.data.user.id}`);
     socket.on('disconnect', () => {
       delete socket.data.user;
     });
@@ -50,10 +52,23 @@ function createSocketServer(httpServer, dependencies, options = {}) {
           where: { auctionId: payload.auctionId },
           include: [{ model: User, as: 'bidder', attributes: ['id', 'username'] }],
           order: [['createdAt', 'DESC'], ['id', 'DESC']],
-          limit: 10,
+          limit: 20,
           offset: 0,
         });
+        const aiResult = AIInteraction ? await AIInteraction.findAndCountAll({
+          where: { auctionId: payload.auctionId, kind: 'commentary', visibility: 'public' },
+          include: User ? [{ model: User, as: 'user', attributes: ['id', 'username'], required: false }] : [],
+          order: [['createdAt', 'DESC'], ['id', 'DESC']],
+          limit: 20,
+          offset: 0,
+        }) : { count: 0, rows: [] };
         const state = auctionToJSON(auction);
+        state.bidCount = count;
+        state.nextMinimumBid = state.status === 'live'
+          ? (state.highestBidderId == null ? state.startingPrice : state.currentPrice + state.minIncrement) <= 2_000_000_000
+            ? (state.highestBidderId == null ? state.startingPrice : state.currentPrice + state.minIncrement)
+            : null
+          : null;
         socket.emit('auction:snapshot', {
           auctionId: state.id,
           version: state.version,
@@ -71,7 +86,9 @@ function createSocketServer(httpServer, dependencies, options = {}) {
                 bidder: value.bidder ? { id: value.bidder.id, username: value.bidder.username } : null,
               };
             }),
-            meta: { page: 1, limit: 10, total: count, totalPages: Math.ceil(count / 10) },
+            aiInteractions: aiResult.rows.map(interactionToJSON),
+            bidsMeta: { page: 1, limit: 20, total: count, totalPages: Math.ceil(count / 20) },
+            aiMeta: { page: 1, limit: 20, total: aiResult.count, totalPages: Math.ceil(aiResult.count / 20) },
           },
         });
         if (typeof ack === 'function') ack({ ok: true, data: { auctionId: payload.auctionId } });

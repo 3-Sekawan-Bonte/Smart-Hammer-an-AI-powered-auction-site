@@ -48,7 +48,13 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
         if (!auction) throw notFound();
 
         const existing = await findExisting(userId, input.clientRequestId, transaction);
-        if (existing) return verifyReplay(existing, auctionId, input.amount);
+        if (existing) {
+          const replay = verifyReplay(existing, auctionId, input.amount);
+          const bidCount = await Bid.count({ where: { auctionId }, transaction });
+          if (typeof auction.setDataValue === 'function') auction.setDataValue('bidCount', bidCount);
+          else auction.bidCount = bidCount;
+          return { ...replay, auction, bidCount };
+        }
 
         if (auction.status === 'ended') throw new HttpError(409, 'AUCTION_ENDED', 'This auction has ended.');
         if (auction.status !== 'live') throw new HttpError(409, 'AUCTION_NOT_LIVE', 'This auction is not live.');
@@ -89,11 +95,14 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
           : auction;
         const bidCount = auctioneer && typeof Bid.count === 'function'
           ? await Bid.count({ where: { auctionId }, transaction })
-          : null;
+          : await Bid.count({ where: { auctionId }, transaction });
+        if (typeof updatedAuction.setDataValue === 'function') updatedAuction.setDataValue('bidCount', bidCount);
+        else updatedAuction.bidCount = bidCount;
         return { bid: serializeBid(bid), replayed: false, auction: updatedAuction, bidCount };
       });
       if (!result.replayed) {
-        try { eventPublisher?.publish('bid:updated', result.auction, { bid: result.bid }); } catch (_error) { /* Socket delivery cannot undo an accepted bid. */ }
+        const { clientRequestId: _privateRequestId, ...publicBid } = result.bid;
+        try { eventPublisher?.publish('bid:updated', result.auction, { bid: publicBid, bidCount: result.bidCount }); } catch (_error) { /* Socket delivery cannot undo an accepted bid. */ }
         if (result.bidCount && result.bidCount % 3 === 0) {
           try {
             auctioneer?.trigger({
@@ -104,16 +113,55 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
           } catch (_error) { /* Commentary never changes bid acceptance. */ }
         }
       }
-      return result;
+      return { ...result, clientRequestId: input.clientRequestId };
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
       const existing = await findExisting(userId, input.clientRequestId);
       if (!existing) throw error;
-      return verifyReplay(existing, auctionId, input.amount);
+      const replay = verifyReplay(existing, auctionId, input.amount);
+      const auction = await Auction.findByPk(auctionId, { include: auctionIncludes });
+      const bidCount = await Bid.count({ where: { auctionId } });
+      if (auction && typeof auction.setDataValue === 'function') auction.setDataValue('bidCount', bidCount);
+      return { ...replay, auction, bidCount, clientRequestId: input.clientRequestId };
     }
   }
 
-  return { place };
+  async function list(userId, auctionId, query = {}) {
+    const fields = {};
+    function positiveInteger(key, fallback, max) {
+      const raw = query[key];
+      if (raw === undefined) return fallback;
+      if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(Number(raw)) || Number(raw) > max) {
+        fields[key] = `Must be an integer from 1 to ${max}.`;
+        return fallback;
+      }
+      return Number(raw);
+    }
+    for (const key of Object.keys(query)) if (!['page', 'limit'].includes(key)) fields[key] = 'Unknown query parameter.';
+    const page = positiveInteger('page', 1, Number.MAX_SAFE_INTEGER);
+    const limit = positiveInteger('limit', 20, 50);
+    if (Object.keys(fields).length) throw new HttpError(400, 'VALIDATION_ERROR', 'Query validation failed.', fields);
+    const auction = await Auction.findByPk(auctionId);
+    if (!auction || (auction.status === 'draft' && auction.sellerId !== userId)) throw notFound();
+    const { count, rows } = await Bid.findAndCountAll({
+      where: { auctionId },
+      include: User ? [{ model: User, as: 'bidder', attributes: ['id', 'username'], required: false }] : [],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      limit,
+      offset: (page - 1) * limit,
+    });
+    return {
+      rows: rows.map((row) => {
+        const value = typeof row.toJSON === 'function' ? row.toJSON() : row;
+        return { id: value.id, auctionId: value.auctionId, userId: value.userId, amount: value.amount,
+          createdAt: new Date(value.createdAt).toISOString(),
+          bidder: value.bidder ? { id: value.bidder.id, username: value.bidder.username } : null };
+      }),
+      meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+    };
+  }
+
+  return { place, list };
 }
 
 module.exports = { createBidService, serializeBid };

@@ -21,7 +21,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Buat `.env.example` dan `.gitignore`.
 - [ ] Konfigurasikan PostgreSQL dan Sequelize.
 - [ ] Tambahkan penanganan error standar.
-- [ ] Pastikan satu panggilan nyata ke OpenAI API (`gpt-4o-mini`) dapat dilakukan dari backend.
+- [x] Pastikan panggilan nyata ke Groq Chat Completions API (`openai/gpt-oss-120b`) berhasil dari backend setelah `GROQ_API_KEY` dikonfigurasi.
 
 **Checkpoint:** frontend dan backend dapat dijalankan; backend dapat terhubung ke database; credential tidak berada di frontend.
 
@@ -121,13 +121,14 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Buat service provider AI backend.
 - [x] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
 - [x] Simpan interaction `pending` sebelum proses AI.
+- [x] Ikat setiap Product Q&A ke pemilik terautentikasi dan simpan sebagai `private`; Auctioneer commentary tetap `public`.
 - [x] Ambil product facts dan auction snapshot dari server.
 - [x] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
 - [x] Simpan hasil `completed`/`failed` serta snapshot metadata.
-- [x] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
-- [x] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
-- [ ] Bangun AIPanel frontend dengan status pending/completed/failed.
-- [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
+- [x] Batasi `GET /auctions/:id/ai/interactions` ke Q&A milik user aktif serta commentary publik, dengan pagination aman.
+- [x] Kirim event Q&A ke room Socket.IO per-user yang dibuat dari JWT; broadcast commentary Auctioneer hanya ke room auction.
+- [x] Bangun AIPanel dengan status pending/completed/failed, riwayat Q&A privat, commentary publik, dan pembersihan state saat logout/pergantian akun.
+- [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, rate limit, privasi REST/Socket.IO, dan snapshot publik.
 
 **Checkpoint:** Q&A nyata berhasil, berbasis konteks server, tersimpan, dan kegagalannya tidak menghentikan bidding.
 
@@ -146,18 +147,33 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 
 ## Phase 9 — Integrasi dan penyelesaian frontend
 
-- [ ] Bangun halaman login/register, daftar lelang (dengan search dan filter category/status), create auction, detail lelang, dan `/my-auctions`.
-- [ ] Implementasikan `authSlice`, `auctionSlice`, dan `socketSlice` sesuai arsitektur.
-- [ ] Gunakan `createAsyncThunk` untuk request REST asynchronous yang sesuai.
-- [ ] Gunakan selectors dan reducer idempotent untuk menggabungkan snapshot, response REST, serta event socket.
-- [ ] Pastikan instance Socket.IO tidak disimpan di Redux dan state tetap serializable.
-- [ ] Tangani loading, error, empty state, dan error code.
-- [ ] Pastikan logout menghapus state privat dan disconnect socket.
-- [ ] Pastikan response dari room lama tidak menimpa room aktif.
-- [ ] Pastikan form tidak menaikkan harga optimistis sebelum server menerima bid.
-- [ ] Buat WinnerBanner untuk pemenang dan hasil tanpa bid.
-- [ ] Pastikan layout responsif dan dapat digunakan di layar kecil.
-- [ ] Buat README untuk install, env, migration, seed, run, test, dan demo.
+### Frontend pages and state
+- [x] Bangun halaman login/register, daftar lelang dengan pencarian dan filter kategori/status, create/edit auction, detail, dan `/my-auctions`.
+- [x] Implementasikan `authSlice`, `auctionSlice`, dan `socketSlice` dengan Redux Toolkit.
+- [x] Gunakan `createAsyncThunk`, selectors, dan reducer idempotent untuk REST, snapshot, serta event.
+- [x] Pastikan instance Socket.IO tidak disimpan di Redux dan state tetap serializable.
+- [x] Tangani loading, error, empty state, dan error code pada alur utama.
+- [x] Pastikan logout menghapus state privat dan disconnect socket.
+- [x] Pastikan respons snapshot/event dari room lama tidak menimpa room aktif.
+- [x] Pastikan bid tidak menaikkan harga optimistis sebelum server menerima penawaran.
+- [x] Tampilkan WinnerBanner hanya dari hasil lelang yang dikonfirmasi server.
+
+### REST and backend contract integration
+- [x] Cocokkan register/login/session restore dengan `POST /users/register`, `POST /users/login`, dan `GET /users/me`; frontend menerima JWT `accessToken` backend.
+- [x] Integrasikan listing, pagination, pencarian, filter, detail, draft create/edit/delete, start, dan seller listing `seller=me`.
+- [x] Gunakan kategori backend yang diizinkan dan kirim field `category` dari form.
+- [x] Cocokkan respons bid/idempotency, tampilkan minimum bid dari state backend, dan sediakan `GET /auctions/:id/bids` terpaginasikan tanpa membocorkan idempotency key.
+- [x] Cocokkan Product Q&A dan riwayat AI dengan API; Q&A privat per pemilik, sedangkan commentary Auctioneer tetap publik.
+- [x] Konfigurasikan URL API/Socket.IO frontend, CORS Express, dan CORS Socket.IO memakai origin yang dikonfigurasi.
+
+### Realtime integration and verification
+- [x] Normalisasi envelope event Socket.IO backend sebelum reducer menggabungkan snapshot, bid, lifecycle, dan AI interaction.
+- [x] Snapshot socket mengirim auction, bid history, interaksi AI publik, pagination, version, dan `serverNow`.
+- [x] Tambahkan tes untuk kontrak login frontend, normalisasi socket, bid history backend, dan allowlist CORS.
+- [x] Jalankan frontend dan backend automated test suites serta production bundle verification.
+- [ ] Verifikasi browser dua akun melawan backend nyata untuk seller → buyer → bid → AI → auction ended, termasuk reconnect dan viewport kecil.
+- [ ] Verifikasi tampilan responsif lewat browser pada ukuran layar yang didukung.
+- [ ] Dokumentasikan install, env, migration, seed, run, test, dan demo lokal pada README/setup guide.
 
 **Checkpoint:** alur end-to-end seller → buyer → AI → bid → auction ended berjalan dari UI.
 

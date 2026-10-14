@@ -62,7 +62,7 @@ describe('auction closure service', () => {
     const publisher = { committed: false, publish: jest.fn(function publish() { expect(this.committed).toBe(true); }) };
     const { service, auction } = setup({ lastBid: { amount: 1_500, userId: 4 }, eventPublisher: publisher });
     await service.close(auction.id);
-    expect(publisher.publish).toHaveBeenCalledWith('auction:ended', auction, { winner: null, finalPrice: 1_500 });
+    expect(publisher.publish).toHaveBeenCalledWith('auction:ended', auction, { winner: null, finalPrice: 1_500, bidCount: 1 });
     publisher.publish.mockClear();
     await service.close(auction.id);
     expect(publisher.publish).not.toHaveBeenCalled();

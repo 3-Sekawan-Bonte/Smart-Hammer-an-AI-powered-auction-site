@@ -1,10 +1,20 @@
-const { createOpenAIProvider } = require('./openAIProvider');
+const { createGroqProvider } = require('./groqProvider');
 const { interactionToJSON } = require('./aiInteractionService');
 
 const SAFE_FAILURE_CODES = new Set(['AI_UNAVAILABLE', 'AI_TIMEOUT', 'AI_INVALID_RESPONSE']);
+const PROVIDER_DIAGNOSTIC_CODES = new Set([
+  ...SAFE_FAILURE_CODES,
+  'AI_CONFIG_MISSING',
+  'AI_AUTH_FAILED',
+  'AI_RATE_LIMITED',
+  'AI_REQUEST_INVALID',
+  'AI_PROVIDER_ERROR',
+  'AI_NETWORK_ERROR',
+]);
 
-function safeLog(logger, auctionId, code) {
-  logger.error(`AI Auctioneer failed for auction ${auctionId} (${code}).`);
+function safeLog(logger, auctionId, code, statusCode) {
+  const status = Number.isInteger(statusCode) ? ` status=${statusCode}` : '';
+  try { logger.error(`AI Auctioneer failed for auction ${auctionId} (${code}${status}).`); } catch (_error) { /* Diagnostics must not interrupt auction operations. */ }
 }
 
 function buildContext(auction, trigger, triggerData = {}, snapshotAt = new Date()) {
@@ -50,7 +60,7 @@ function buildContext(auction, trigger, triggerData = {}, snapshotAt = new Date(
 
 function createAuctioneerService({
   AIInteraction,
-  provider = createOpenAIProvider(),
+  provider = createGroqProvider(),
   eventPublisher,
   clock = () => new Date(),
   logger = console,
@@ -109,13 +119,14 @@ function createAuctioneerService({
       publish('ai:message', interaction);
     } catch (error) {
       const errorCode = SAFE_FAILURE_CODES.has(error?.code) ? error.code : 'AI_UNAVAILABLE';
+      const diagnosticCode = PROVIDER_DIAGNOSTIC_CODES.has(error?.code) ? error.code : 'AI_UNAVAILABLE';
       try {
         await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode });
         publish('ai:error', interaction, 'Auctioneer commentary is temporarily unavailable.');
       } catch (_persistError) {
         safeLog(logger, auction.id, 'PERSISTENCE_FAILED');
       }
-      safeLog(logger, auction.id, errorCode);
+      safeLog(logger, auction.id, diagnosticCode, error?.statusCode);
     }
   }
 

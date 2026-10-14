@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api, { getApiData, getApiError } from '../../lib/api.js';
-import { auctionFieldsConflict, isValidEvent, mergeBids, mergePublicInteractions, sameId, validateSnapshot } from './auctionRoom.js';
+import { auctionFieldsConflict, isValidEvent, mergeBids, mergePublicInteractions, normalizeSocketEvent, sameId, validateSnapshot } from './auctionRoom.js';
 import { estimateServerOffset } from './serverClock.js';
 
 const initialState = {
@@ -21,6 +21,8 @@ const initialState = {
     auction: null,
     bids: [],
     publicAIInteractions: [],
+    privateAIInteractions: [],
+    privateAIUserId: null,
     participants: [],
     loading: false,
     error: null,
@@ -52,7 +54,7 @@ const fixtureImagePositions = {
 function toAuctionCard(item) {
   return {
     ...item,
-    category: item.category || 'electronics',
+    category: item.category || null,
     price: Number(item.currentPrice ?? item.startingPrice ?? 0),
     bids: Number(item.bidCount ?? 0),
     time: remainingTime(item.endsAt),
@@ -71,6 +73,15 @@ function requestError(error, fallback) {
   };
 }
 
+function normalizePageMeta(meta, page, limit, count) {
+  return {
+    currentPage: meta?.page ?? meta?.currentPage ?? page,
+    limit: meta?.limit ?? limit,
+    totalData: meta?.total ?? meta?.totalData ?? count,
+    totalPages: meta?.totalPages ?? Math.ceil(count / limit),
+  };
+}
+
 function remainingTime(endsAt) {
   if (!endsAt) return '00:00';
   const totalSeconds = Math.max(0, Math.floor((new Date(endsAt).getTime() - Date.now()) / 1000));
@@ -83,12 +94,13 @@ function remainingTime(endsAt) {
 
 export const loadAuctions = createAsyncThunk(
   'auction/loadAuctions',
-  async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
+  async ({ page = 1, limit = 10, status, category, search, seller } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get('/auctions', { params: { page, limit } });
+      const params = { page, limit, ...(status ? { status } : {}), ...(category ? { category } : {}), ...(search?.trim() ? { search: search.trim() } : {}), ...(seller ? { seller } : {}) };
+      const response = await api.get('/auctions', { params });
       const auctions = getApiData(response);
       if (!Array.isArray(auctions)) throw new Error('Format respons daftar lelang tidak valid.');
-      return { auctions: auctions.map(toAuctionCard), meta: response.data?.meta || { currentPage: page, limit, totalData: auctions.length, totalPages: 1 } };
+      return { auctions: auctions.map(toAuctionCard), meta: normalizePageMeta(response.data?.meta, page, limit, auctions.length) };
     } catch (error) {
       return rejectWithValue(getApiError(error, error.message || 'Daftar lelang gagal dimuat.'));
     }
@@ -117,6 +129,18 @@ export const updateAuction = createAsyncThunk(
       return toAuctionCard(result.auction ?? result);
     } catch (error) {
       return rejectWithValue(requestError(error, 'Draft gagal diperbarui. Periksa data dan coba lagi.'));
+    }
+  }
+);
+
+export const deleteAuction = createAsyncThunk(
+  'auction/deleteAuction',
+  async (auctionId, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/auctions/${auctionId}`);
+      return getApiData(response);
+    } catch (error) {
+      return rejectWithValue(requestError(error, 'Draft gagal dihapus. Muat ulang dan coba lagi.'));
     }
   }
 );
@@ -179,10 +203,11 @@ export const submitBid = createAsyncThunk(
 
 export const askAI = createAsyncThunk(
   'auction/askAI',
-  async ({ auctionId, question }, { rejectWithValue }) => {
+  async ({ auctionId, question }, { rejectWithValue, getState }) => {
+    const userId = getState().auth.user?.id ?? null;
     try {
       const response = await api.post(`/auctions/${auctionId}/ai/questions`, { question });
-      return { ...getApiData(response), auctionId: String(auctionId) };
+      return { ...getApiData(response), auctionId: String(auctionId), userId };
     } catch (error) {
       return rejectWithValue({
         status: error.response?.status || null,
@@ -196,13 +221,14 @@ export const askAI = createAsyncThunk(
 
 export const loadAIInteractions = createAsyncThunk(
   'auction/loadAIInteractions',
-  async ({ auctionId, page = 1, limit = 20 } = {}, { rejectWithValue }) => {
+  async ({ auctionId, page = 1, limit = 20 } = {}, { rejectWithValue, getState }) => {
+    const userId = getState().auth.user?.id ?? null;
     try {
       const response = await api.get(`/auctions/${auctionId}/ai/interactions`, { params: { page, limit } });
       const result = getApiData(response);
       const interactions = Array.isArray(result) ? result : result?.aiInteractions;
       if (!Array.isArray(interactions)) throw new Error('Format riwayat AI tidak valid.');
-      return { interactions, meta: response.data?.meta || result?.meta || null, auctionId: String(auctionId), page };
+      return { interactions, meta: normalizePageMeta(response.data?.meta || result?.meta, page, limit, interactions.length), auctionId: String(auctionId), page, userId };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat AI.');
     }
@@ -217,7 +243,7 @@ export const loadBids = createAsyncThunk(
       const result = getApiData(response);
       const bids = Array.isArray(result) ? result : result?.bids;
       if (!Array.isArray(bids)) throw new Error('Format riwayat bid tidak valid.');
-      return { bids, meta: response.data?.meta || result?.meta || null, auctionId: String(auctionId), page };
+      return { bids, meta: normalizePageMeta(response.data?.meta || result?.meta, page, limit, bids.length), auctionId: String(auctionId), page };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat bid.');
     }
@@ -236,7 +262,9 @@ export const processAuctionEvent = (eventName, payload) => (dispatch, getState) 
   };
   const actionCreator = actions[eventName];
   if (!actionCreator) return null;
-  dispatch(actionCreator(payload));
+  const normalized = normalizeSocketEvent(payload);
+  if (normalized.interaction?.kind === 'question') normalized.authenticatedUserId = getState().auth.user?.id ?? null;
+  dispatch(actionCreator(normalized));
   const { active } = getState().auction;
   if (active.resyncRequired && active.currentId && !active.requestId) return dispatch(loadAuctionSnapshot(active.currentId));
   return null;
@@ -339,9 +367,38 @@ function mergeEventCollections(active, payload) {
   if (Array.isArray(interactions)) active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, interactions, auctionId);
 }
 
-function applyAI(active, interaction) {
+function mergePrivateInteractions(existing = [], incoming = [], auctionId, userId) {
+  const valid = (item) => item?.id != null && sameId(item.auctionId, auctionId)
+    && item.kind === 'question' && item.visibility === 'private' && sameId(item.userId, userId);
+  const byId = new Map(existing.filter(valid).map((item) => [String(item.id), item]));
+  for (const item of incoming) {
+    if (!valid(item)) continue;
+    const previous = byId.get(String(item.id));
+    if (!previous) { byId.set(String(item.id), item); continue; }
+    const oldTime = Date.parse(previous.updatedAt || previous.createdAt || '') || 0;
+    const newTime = Date.parse(item.updatedAt || item.createdAt || '') || 0;
+    const oldRank = { pending: 0, completed: 1, failed: 1 }[previous.status] ?? -1;
+    const newRank = { pending: 0, completed: 1, failed: 1 }[item.status] ?? -1;
+    if (newRank < oldRank || (newRank === oldRank && newTime < oldTime)
+      || (['completed', 'failed'].includes(previous.status) && item.status !== previous.status)) continue;
+    byId.set(String(item.id), { ...previous, ...item });
+  }
+  return [...byId.values()].sort((a, b) => (Date.parse(a.createdAt || '') || 0) - (Date.parse(b.createdAt || '') || 0));
+}
+
+function applyAI(active, payload) {
+  const interaction = payload?.interaction || payload;
   if (!interaction || !active.auction || !sameId(interaction.auctionId, active.currentId)) return;
-  active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, [interaction], active.currentId);
+  if (interaction.kind === 'commentary' && interaction.visibility === 'public') {
+    active.publicAIInteractions = mergePublicInteractions(active.publicAIInteractions, [interaction], active.currentId);
+    return;
+  }
+  const ownerId = payload?.authenticatedUserId ?? active.privateAIUserId;
+  if (interaction.kind !== 'question' || interaction.visibility !== 'private' || ownerId == null
+    || !sameId(interaction.userId, ownerId)) return;
+  if (active.privateAIUserId != null && !sameId(active.privateAIUserId, ownerId)) return;
+  active.privateAIUserId = ownerId;
+  active.privateAIInteractions = mergePrivateInteractions(active.privateAIInteractions, [interaction], active.currentId, ownerId);
 }
 
 function applyMutationAuction(active, auction) {
@@ -376,13 +433,13 @@ const auctionSlice = createSlice({
       applyIncremental(state.active, action.payload, toAuctionCard);
     },
     aiPending(state, action) {
-      applyAI(state.active, action.payload?.interaction || action.payload);
+      applyAI(state.active, action.payload);
     },
     aiReceived(state, action) {
-      applyAI(state.active, action.payload?.interaction || action.payload);
+      applyAI(state.active, action.payload);
     },
     aiFailed(state, action) {
-      applyAI(state.active, action.payload?.interaction || action.payload);
+      applyAI(state.active, action.payload);
     },
     presenceReceived(state, action) {
       if (Array.isArray(action.payload) && action.payload.every((item) => item && typeof item === 'object')) state.active.participants = action.payload;
@@ -477,6 +534,8 @@ const auctionSlice = createSlice({
           state.active.auction = null;
           state.active.bids = [];
           state.active.publicAIInteractions = [];
+          state.active.privateAIInteractions = [];
+          state.active.privateAIUserId = null;
           state.active.participants = [];
           state.active.version = 0;
           state.active.serverNow = null;
@@ -527,18 +586,27 @@ const auctionSlice = createSlice({
       .addCase(askAI.fulfilled, (state, action) => {
         const interaction = action.payload?.interaction;
         if (sameId(state.active.currentId, action.payload?.auctionId) && interaction) {
-          state.active.publicAIInteractions = mergePublicInteractions(state.active.publicAIInteractions, [interaction], state.active.currentId);
+          applyAI(state.active, { interaction, authenticatedUserId: action.payload.userId });
         }
       })
       .addCase(askAI.rejected, (state, action) => {
         // Error handled in component
       })
       .addCase(loadAIInteractions.pending, (state, action) => {
-        if (sameId(state.active.currentId, action.meta.arg)) state.active.aiRequestId = action.meta.requestId;
+        if (sameId(state.active.currentId, action.meta.arg.auctionId)) state.active.aiRequestId = action.meta.requestId;
       })
       .addCase(loadAIInteractions.fulfilled, (state, action) => {
         if (!sameId(state.active.currentId, action.payload.auctionId) || state.active.aiRequestId !== action.meta.requestId) return;
-        state.active.publicAIInteractions = mergePublicInteractions(state.active.publicAIInteractions, action.payload.interactions, state.active.currentId);
+        const commentary = action.payload.interactions.filter((item) => item?.kind === 'commentary' && item?.visibility === 'public');
+        const questions = action.payload.interactions.filter((item) => item?.kind === 'question' && item?.visibility === 'private');
+        state.active.publicAIInteractions = mergePublicInteractions(state.active.publicAIInteractions, commentary, state.active.currentId);
+        if (action.payload.userId != null && (state.active.privateAIUserId == null || sameId(state.active.privateAIUserId, action.payload.userId))) {
+          state.active.privateAIUserId = action.payload.userId;
+          state.active.privateAIInteractions = mergePrivateInteractions(state.active.privateAIInteractions, questions, state.active.currentId, action.payload.userId);
+        } else if (action.payload.userId == null) {
+          state.active.privateAIInteractions = [];
+          state.active.privateAIUserId = null;
+        }
         state.active.aiMeta = action.payload.meta;
         state.active.aiRequestId = null;
       })
@@ -567,8 +635,12 @@ const auctionSlice = createSlice({
         state.edit = { ...initialState.edit };
         state.start = { ...initialState.start };
       })
-      .addCase('auth/login/fulfilled', (state) => { state.active = { ...initialState.active }; })
-      .addCase('auth/restoreSession/fulfilled', (state) => { state.active = { ...initialState.active }; });
+      .addCase('auth/login/fulfilled', (state, action) => {
+        state.active = { ...initialState.active, privateAIUserId: action.payload?.user?.id ?? null };
+      })
+      .addCase('auth/restoreSession/fulfilled', (state, action) => {
+        state.active = { ...initialState.active, privateAIUserId: action.payload?.user?.id ?? null };
+      });
   },
 });
 
@@ -603,7 +675,10 @@ export const selectStartError = (state) => state.auction.start.error;
 
 export const selectActiveAuction = (state) => state.auction.active.auction;
 export const selectActiveBids = (state) => state.auction.active.bids;
-export const selectActiveAIInteractions = (state) => state.auction.active.publicAIInteractions;
+export const selectActiveAIInteractions = (state) => [
+  ...state.auction.active.publicAIInteractions,
+  ...state.auction.active.privateAIInteractions,
+].sort((a, b) => (Date.parse(a.createdAt || '') || 0) - (Date.parse(b.createdAt || '') || 0));
 export const selectActiveParticipants = (state) => state.auction.active.participants;
 export const selectActiveLoading = (state) => state.auction.active.loading;
 export const selectActiveError = (state) => state.auction.active.error;

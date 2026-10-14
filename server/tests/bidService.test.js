@@ -69,7 +69,7 @@ describe('bid service state rules', () => {
     const publisher = { committed: false, publish: jest.fn(function publish() { expect(this.committed).toBe(true); }) };
     const { service, auction } = setup({}, publisher);
     await service.place(4, auction.id, input);
-    expect(publisher.publish).toHaveBeenCalledWith('bid:updated', auction, { bid: expect.objectContaining({ amount: input.amount }) });
+    expect(publisher.publish).toHaveBeenCalledWith('bid:updated', auction, { bid: expect.objectContaining({ amount: input.amount }), bidCount: 1 });
 
     publisher.publish.mockClear();
     await expect(setup({ status: 'draft' }, publisher).service.place(4, 8, input)).rejects.toMatchObject({ code: 'AUCTION_NOT_LIVE' });

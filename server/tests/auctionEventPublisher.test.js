@@ -38,14 +38,14 @@ describe('auction event publisher', () => {
     expect(() => publisher.attach({})).toThrow('already has a Socket.IO server');
   });
 
-  test('publishes AI interactions only to their auction room with snapshot version metadata', () => {
+  test('publishes public Auctioneer commentary only to auction rooms', () => {
     const emit = jest.fn();
     const publisher = createAuctionEventPublisher();
     publisher.attach({ to: () => ({ emit }) });
     publisher.publishAIInteraction('ai:message', {
       auctionId: 12,
       version: 4,
-      interaction: { id: 99, kind: 'commentary', status: 'completed', sourceVersion: 4 },
+      interaction: { id: 99, kind: 'commentary', visibility: 'public', status: 'completed', sourceVersion: 4 },
     });
     expect(emit).toHaveBeenCalledWith('ai:message', expect.objectContaining({
       auctionId: 12,
@@ -53,5 +53,22 @@ describe('auction event publisher', () => {
       serverNow: expect.any(String),
       data: { interaction: expect.objectContaining({ kind: 'commentary', status: 'completed' }) },
     }));
+  });
+
+  test('private question events are owner-only and cannot be sent through the public publisher', () => {
+    const emit = jest.fn();
+    const to = jest.fn(() => ({ emit }));
+    const publisher = createAuctionEventPublisher();
+    publisher.attach({ to });
+    const question = { id: 100, userId: 8, kind: 'question', visibility: 'private', status: 'pending' };
+    publisher.publishAIInteraction('ai:pending', { auctionId: 12, version: 4, interaction: question });
+    expect(to).not.toHaveBeenCalled();
+    publisher.publishPrivateAIInteraction(8, 'ai:pending', { auctionId: 12, version: 4, interaction: question });
+    expect(to).toHaveBeenCalledWith('user:8');
+    expect(emit).toHaveBeenCalledWith('ai:pending', expect.objectContaining({
+      auctionId: 12, version: 4, serverNow: expect.any(String), data: { interaction: question },
+    }));
+    publisher.publishPrivateAIInteraction(9, 'ai:pending', { auctionId: 12, version: 4, interaction: question });
+    expect(to).toHaveBeenCalledTimes(1);
   });
 });

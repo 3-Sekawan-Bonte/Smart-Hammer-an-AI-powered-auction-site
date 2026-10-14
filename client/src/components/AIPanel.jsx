@@ -27,10 +27,10 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
   const canAsk = Boolean(user && activeId === id && ['live', 'ended'].includes(currentStatus));
 
   useEffect(() => {
-    if (activeId === id && !meta && !Number(interactions.length)) {
+    if (activeId === id && user) {
       dispatch(loadAIInteractions({ auctionId: id, page: 1 })).unwrap().catch(() => setHistoryError(true));
     }
-  }, [dispatch, id, activeId, meta, interactions.length]);
+  }, [dispatch, id, activeId, user?.id]);
 
   useEffect(() => {
     if (!pending || connectionStatus === 'connected' || !user || activeId !== id) return undefined;
@@ -41,9 +41,9 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
   }, [dispatch, id, activeId, pending, connectionStatus, user]);
 
   useEffect(() => {
-    if (!pending || connectionStatus !== 'connected' || !user || activeId !== id) return;
+    if (connectionStatus !== 'connected' || !user || activeId !== id) return;
     dispatch(loadAIInteractions({ auctionId: id, page: 1 })).unwrap().catch(() => setHistoryError(true));
-  }, [dispatch, id, activeId, pending, connectionStatus, user]);
+  }, [dispatch, id, activeId, connectionStatus, user?.id]);
 
   useEffect(() => {
     if (!cooldownUntil) return undefined;
@@ -71,14 +71,14 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
     } finally { setSending(false); }
   }
 
-  const ordered = [...interactions].filter((item) => item.visibility === 'public').reverse();
+  const ordered = [...interactions].reverse();
   return <section className="ai-panel card-panel" aria-labelledby="ai-panel-title">
     <header className="ai-panel-header"><div className="ai-avatar" aria-hidden="true">✦</div><div><p className="eyebrow">Smart Hammer AI</p><h2 id="ai-panel-title">AI Auctioneer</h2><p className="ai-panel-intro">Tanyakan detail produk atau lihat komentar lelang dari data yang tersedia.</p></div></header>
     <div className="ai-disclosure">Jawaban AI merujuk pada informasi penjual dan snapshot lelang. Informasi produk belum diverifikasi secara independen.</div>
     <div className="ai-history" aria-live="polite">
       {!ordered.length && <div className="ai-empty"><span aria-hidden="true">✧</span><strong>Belum ada percakapan</strong><p>Ajukan pertanyaan tentang spesifikasi, kondisi, garansi, atau kelengkapan produk.</p></div>}
       {ordered.map((item) => <article className={`ai-interaction ai-interaction-${item.status}`} key={item.id}>
-        {item.kind === 'commentary' ? <p className="ai-commentary-label">✦ Komentar AI Auctioneer {item.generatedBy === 'mock' ? '· simulasi' : ''}</p> : <div className="ai-question"><span>{item.askedBy?.username || 'Pengguna'}</span><time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time><p>{item.question}</p></div>}
+        {item.kind === 'commentary' ? <p className="ai-commentary-label">✦ Komentar AI Auctioneer {item.generatedBy === 'mock' ? '· simulasi' : ''}</p> : <div className="ai-question"><span>{item.user?.username || item.askedBy?.username || 'Pengguna'}</span><time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time><p>{item.question}</p></div>}
         {item.status === 'pending' && <div className="ai-pending"><span className="ai-spinner" aria-hidden="true" />AI sedang menyiapkan jawaban…</div>}
         {item.status === 'completed' && <div className="ai-answer"><span className="ai-answer-label">Jawaban AI {item.generatedBy === 'mock' ? '· simulasi' : ''}</span><p>{item.answer}</p>{item.missingInformation?.length > 0 && <div className="ai-missing"><strong>Belum tersedia dari penjual:</strong><ul>{item.missingInformation.map((missing) => <li key={missing}>{missingLabel(missing)}</li>)}</ul></div>}</div>}
         {item.status === 'failed' && <div className="ai-failed" role="status">{item.errorCode === 'AI_INTERRUPTED' ? 'Proses AI terhenti saat server dimulai ulang.' : 'Layanan AI belum dapat menjawab. Silakan ajukan pertanyaan baru nanti.'}</div>}

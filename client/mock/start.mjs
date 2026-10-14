@@ -5,7 +5,7 @@ import {
   scrypt as scryptCallback,
   timingSafeEqual,
 } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -33,7 +33,13 @@ async function readDatabase(databasePath) {
 }
 
 async function saveDatabase(databasePath, database) {
-  await writeFile(databasePath, `${JSON.stringify(database, null, 2)}\n`, 'utf8');
+  const temporaryPath = `${databasePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(database, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+    await rename(temporaryPath, databasePath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
 }
 
 function send(response, status, body) {
@@ -227,7 +233,7 @@ function serializeBid(database, bid) {
 function buildAuctionSnapshot(database, auctionId) {
   const bids = database.bids.filter((bid) => Number(bid.auctionId) === Number(auctionId))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
-  const aiInteractions = database.aiInteractions.filter((item) => Number(item.auctionId) === Number(auctionId) && item.visibility === 'public')
+  const aiInteractions = database.aiInteractions.filter((item) => Number(item.auctionId) === Number(auctionId) && item.kind === 'commentary' && item.visibility === 'public')
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
   const page = (items) => ({ currentPage: 1, limit: 20, totalData: items.length, totalPages: Math.ceil(items.length / 20) });
   return {
@@ -382,7 +388,7 @@ export function createMockServer({
         await saveDatabase(databasePath, latest);
         return record;
       });
-      if (interaction && !shutdown) io?.to(`auction:${auctionId}`).emit('ai:message', { auctionId, serverNow: nowDate().toISOString(), interaction });
+      if (interaction && !shutdown) io?.to(`user:${interaction.userId}`).emit('ai:message', { auctionId, version: interaction.sourceVersion, serverNow: nowDate().toISOString(), data: { interaction } });
     } catch (error) {
       const interaction = await serializeAuctionMutation(async () => {
         const latest = await readDatabase(databasePath);
@@ -396,7 +402,7 @@ export function createMockServer({
         await saveDatabase(databasePath, latest);
         return record;
       });
-      if (interaction && !shutdown) io?.to(`auction:${auctionId}`).emit('ai:error', { auctionId, serverNow: nowDate().toISOString(), interaction, message: 'AI belum dapat menjawab saat ini. Silakan ajukan pertanyaan baru nanti.' });
+      if (interaction && !shutdown) io?.to(`user:${interaction.userId}`).emit('ai:error', { auctionId, version: interaction.sourceVersion, serverNow: nowDate().toISOString(), data: { interaction, message: 'AI belum dapat menjawab saat ini. Silakan ajukan pertanyaan baru nanti.' } });
     }
   };
   const scheduleCommentary = async (auctionId, reason) => {
@@ -425,7 +431,7 @@ export function createMockServer({
           await saveDatabase(databasePath, latest);
           return record;
         });
-        if (interaction && !shutdown) io?.to(`auction:${auctionId}`).emit('ai:message', { auctionId, serverNow: nowDate().toISOString(), interaction });
+        if (interaction && !shutdown) io?.to(`auction:${auctionId}`).emit('ai:message', { auctionId, version: interaction.sourceVersion, serverNow: nowDate().toISOString(), data: { interaction } });
       } finally {
         commentaryRooms.delete(auctionId);
         aiTasks.delete(task);
@@ -569,13 +575,13 @@ export function createMockServer({
         }
         if (['ai-pending', 'ai-message', 'ai-error'].includes(scenario)) {
           let interaction = scenario === 'ai-pending' ? null : database.aiInteractions
-            .filter((item) => Number(item.auctionId) === id && item.visibility === 'public' && item.status === 'pending')
+            .filter((item) => Number(item.auctionId) === id && Number(item.userId) === Number(currentUser.id) && item.kind === 'question' && item.visibility === 'private' && item.status === 'pending')
             .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
           if (interaction) interaction = { ...interaction };
           else interaction = {
               id: Math.max(0, ...database.aiInteractions.map((item) => Number(item.id) || 0)) + 1,
               auctionId: id,
-              kind: 'question', visibility: 'public',
+              kind: 'question', visibility: 'private', userId: Number(currentUser.id),
               askedBy: { id: Number(currentUser.id), username: currentUser.username },
               question: 'Apakah semua aksesori produk tersedia?',
               answer: null, missingInformation: [], status: 'pending',
@@ -596,8 +602,8 @@ export function createMockServer({
           else database.aiInteractions.push(interaction);
           await saveDatabase(databasePath, database);
           eventName = ({ 'ai-pending': 'ai:pending', 'ai-message': 'ai:message', 'ai-error': 'ai:error' })[scenario];
-          payload = { auctionId: id, version: Number(auction.version ?? 0), serverNow: now, interaction };
-          io.to(room).emit(eventName, payload);
+          payload = { auctionId: id, version: Number(auction.version ?? 0), serverNow: now, data: { interaction } };
+          io.to(`user:${currentUser.id}`).emit(eventName, payload);
           return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, interaction } });
         }
         return errorResponse(response, 404, 'NOT_FOUND', 'Skenario mock tidak tersedia.');
@@ -842,7 +848,7 @@ export function createMockServer({
           .filter((bid) => Number(bid.auctionId) === id)
           .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
         const aiInteractions = database.aiInteractions
-          .filter((item) => Number(item.auctionId) === id && item.visibility === 'public')
+          .filter((item) => Number(item.auctionId) === id && item.kind === 'commentary' && item.visibility === 'public')
           .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
         const bidPage = paginate(bids, url.searchParams, 20);
         if (bidPage.error) return errorResponse(response, 400, 'VALIDATION_ERROR', bidPage.error);
@@ -905,7 +911,7 @@ export function createMockServer({
           const snapshotAt = nowDate().toISOString();
           const interaction = {
             id: Math.max(0, ...latest.aiInteractions.map((item) => Number(item.id) || 0)) + 1,
-            auctionId: id, kind: 'question', visibility: 'public',
+            auctionId: id, kind: 'question', visibility: 'private', userId: Number(currentUser.id),
             askedBy: { id: Number(currentUser.id), username: currentUser.username },
             question, answer: null, missingInformation: [], status: 'pending',
             sourceVersion: Number(sourceAuction.version ?? 0), snapshotAt, errorCode: null,
@@ -921,7 +927,7 @@ export function createMockServer({
           } };
         });
         if (!pending) return errorResponse(response, 409, 'AUCTION_NOT_AVAILABLE', 'Lelang tidak lagi menerima pertanyaan.');
-        io?.to(`auction:${id}`).emit('ai:pending', { auctionId: id, serverNow: nowDate().toISOString(), interaction: pending.interaction });
+        io?.to(`user:${currentUser.id}`).emit('ai:pending', { auctionId: id, version: pending.interaction.sourceVersion, serverNow: nowDate().toISOString(), data: { interaction: pending.interaction } });
         const task = processAIInteraction(pending.interaction.id, id, question, pending.facts)
           .catch(() => undefined).finally(() => aiTasks.delete(task));
         aiTasks.add(task);
@@ -932,7 +938,10 @@ export function createMockServer({
         const auction = id && database.auctions.find((entry) => Number(entry.id) === id);
         if (!id) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.', { id: 'ID harus integer positif.' });
         if (!auction || (auction.status === 'draft' && !isOwner(auction, currentUser))) return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
-        const interactions = database.aiInteractions.filter((item) => Number(item.auctionId) === id && item.visibility === 'public')
+        const interactions = database.aiInteractions.filter((item) => Number(item.auctionId) === id && (
+          (item.kind === 'commentary' && item.visibility === 'public') ||
+          (item.kind === 'question' && item.visibility === 'private' && Number(item.userId) === Number(currentUser.id))
+        ))
           .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || Number(b.id) - Number(a.id));
         const page = paginate(interactions, url.searchParams, 20);
         if (page.error) return errorResponse(response, 400, 'VALIDATION_ERROR', page.error);
@@ -995,6 +1004,7 @@ export function createMockServer({
     }
   });
   io.on('connection', (socket) => {
+    socket.join(`user:${socket.data.userId}`);
     const decoded = JSON.parse(Buffer.from(socket.data.accessToken.split('.')[1], 'base64url').toString('utf8'));
     const expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, decoded.exp * 1000 - Date.now()));
     expiryTimer.unref?.();

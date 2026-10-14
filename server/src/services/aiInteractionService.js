@@ -1,8 +1,18 @@
 const HttpError = require('../utils/httpError');
+const { Op } = require('sequelize');
 const { createAIQuestionRateLimiter } = require('./aiQuestionRateLimiter');
-const { createOpenAIProvider } = require('./openAIProvider');
+const { createGroqProvider } = require('./groqProvider');
 
 const SAFE_PROVIDER_CODES = new Set(['AI_UNAVAILABLE', 'AI_TIMEOUT', 'AI_INVALID_RESPONSE']);
+const PROVIDER_DIAGNOSTIC_CODES = new Set([
+  ...SAFE_PROVIDER_CODES,
+  'AI_CONFIG_MISSING',
+  'AI_AUTH_FAILED',
+  'AI_RATE_LIMITED',
+  'AI_REQUEST_INVALID',
+  'AI_PROVIDER_ERROR',
+  'AI_NETWORK_ERROR',
+]);
 
 function notFound() {
   return new HttpError(404, 'NOT_FOUND', 'Auction was not found.');
@@ -54,14 +64,20 @@ function createAIInteractionService({
   Auction,
   AIInteraction,
   User,
-  provider = createOpenAIProvider(),
+  provider = createGroqProvider(),
   rateLimiter = createAIQuestionRateLimiter(),
   eventPublisher,
+  logger = console,
   clock = () => new Date(),
 }) {
+  function logProviderFailure(code, statusCode) {
+    const status = Number.isInteger(statusCode) ? ` status=${statusCode}` : '';
+    try { logger.error(`AI Product Q&A provider failure (${code}${status}).`); } catch (_error) { /* Diagnostics must not interrupt request handling. */ }
+  }
+
   function publish(event, interaction, message) {
     try {
-      eventPublisher?.publishAIInteraction(event, {
+      eventPublisher?.publishPrivateAIInteraction(interaction.userId, event, {
         auctionId: interaction.auctionId,
         version: interaction.sourceVersion,
         interaction: interactionToJSON(interaction),
@@ -93,7 +109,7 @@ function createAIInteractionService({
       auctionId,
       userId,
       kind: 'question',
-      visibility: 'public',
+      visibility: 'private',
       question,
       answer: null,
       missingInformation: [],
@@ -109,6 +125,8 @@ function createAIInteractionService({
       result = await provider.answerQuestion({ question, context });
     } catch (error) {
       const errorCode = SAFE_PROVIDER_CODES.has(error?.code) ? error.code : 'AI_UNAVAILABLE';
+      const diagnosticCode = PROVIDER_DIAGNOSTIC_CODES.has(error?.code) ? error.code : 'AI_UNAVAILABLE';
+      logProviderFailure(diagnosticCode, error?.statusCode);
       try {
         await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode });
         publish('ai:error', interaction, 'The AI answer service is temporarily unavailable.');
@@ -136,7 +154,13 @@ function createAIInteractionService({
   async function list(userId, auctionId, { page, limit }) {
     await getAccessibleAuction(auctionId, userId);
     const { count, rows } = await AIInteraction.findAndCountAll({
-      where: { auctionId, visibility: 'public' },
+      where: {
+        auctionId,
+        [Op.or]: [
+          { kind: 'commentary', visibility: 'public' },
+          { kind: 'question', visibility: 'private', userId },
+        ],
+      },
       include: User ? [{ model: User, as: 'user', attributes: ['id', 'username'], required: false }] : [],
       order: [['createdAt', 'DESC'], ['id', 'DESC']],
       limit,

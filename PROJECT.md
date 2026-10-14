@@ -37,7 +37,7 @@ Aplikasi ini menggunakan nominal simulasi. MVP tidak memproses uang nyata, pemba
 - PostgreSQL
 - JWT untuk autentikasi (expiry 7 hari)
 - bcryptjs untuk hash password
-- OpenAI API (`gpt-4o-mini`) via raw HTTP call untuk fitur AI
+- Groq Chat Completions API (`openai/gpt-oss-120b`) via raw HTTP call untuk fitur AI
 - Jest dan Supertest untuk testing
 
 Gunakan Redux Toolkit untuk state global aplikasi. Instance Socket.IO tetap dikelola service terpisah dan tidak disimpan di Redux.

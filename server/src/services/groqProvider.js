@@ -1,7 +1,8 @@
 class AIProviderError extends Error {
-  constructor(code) {
+  constructor(code, statusCode = null) {
     super(code);
     this.code = code;
+    this.statusCode = Number.isInteger(statusCode) ? statusCode : null;
   }
 }
 
@@ -42,23 +43,35 @@ function normalizeOutput(content) {
   };
 }
 
-function createOpenAIProvider({ env = process.env, fetchImpl = globalThis.fetch, timeoutMs = 18_000 } = {}) {
+const GROQ_CHAT_COMPLETIONS_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+
+function classifyGroqHttpFailure(statusCode) {
+  if (statusCode === 401 || statusCode === 403) return 'AI_AUTH_FAILED';
+  if (statusCode === 429) return 'AI_RATE_LIMITED';
+  if (statusCode === 400 || statusCode === 422) return 'AI_REQUEST_INVALID';
+  if (statusCode === 408 || statusCode === 504) return 'AI_TIMEOUT';
+  return 'AI_PROVIDER_ERROR';
+}
+
+function createGroqProvider({ env = process.env, fetchImpl = globalThis.fetch, timeoutMs = 18_000 } = {}) {
   async function requestStructured(systemPrompt, payload) {
-    if (!env.OPENAI_API_KEY) throw new AIProviderError('AI_UNAVAILABLE');
+    if (!env.GROQ_API_KEY) throw new AIProviderError('AI_CONFIG_MISSING');
     if (typeof fetchImpl !== 'function') throw new AIProviderError('AI_UNAVAILABLE');
-    const baseUrl = (env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
     let response;
     try {
-      response = await fetchImpl(`${baseUrl}/chat/completions`, {
+      response = await fetchImpl(GROQ_CHAT_COMPLETIONS_URL, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+          Authorization: `Bearer ${env.GROQ_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: env.OPENAI_MODEL || 'gpt-4o-mini',
+          model: env.GROQ_MODEL || DEFAULT_GROQ_MODEL,
           temperature: 0,
-          max_tokens: 500,
+          max_completion_tokens: 1024,
+          reasoning_effort: 'medium',
+          include_reasoning: false,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt },
@@ -68,10 +81,13 @@ function createOpenAIProvider({ env = process.env, fetchImpl = globalThis.fetch,
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
-      throw new AIProviderError(error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'AI_TIMEOUT' : 'AI_UNAVAILABLE');
+      throw new AIProviderError(error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 'AI_TIMEOUT' : 'AI_NETWORK_ERROR');
     }
 
-    if (!response?.ok) throw new AIProviderError('AI_UNAVAILABLE');
+    if (!response?.ok) {
+      const statusCode = Number.isInteger(response?.status) ? response.status : null;
+      throw new AIProviderError(statusCode ? classifyGroqHttpFailure(statusCode) : 'AI_PROVIDER_ERROR', statusCode);
+    }
     let body;
     try { body = await response.json(); } catch (_error) { throw new AIProviderError('AI_INVALID_RESPONSE'); }
     return normalizeOutput(body?.choices?.[0]?.message?.content);
@@ -87,4 +103,13 @@ function createOpenAIProvider({ env = process.env, fetchImpl = globalThis.fetch,
   };
 }
 
-module.exports = { AIProviderError, SYSTEM_PROMPT, AUCTIONEER_SYSTEM_PROMPT, normalizeOutput, createOpenAIProvider };
+module.exports = {
+  AIProviderError,
+  SYSTEM_PROMPT,
+  AUCTIONEER_SYSTEM_PROMPT,
+  GROQ_CHAT_COMPLETIONS_URL,
+  DEFAULT_GROQ_MODEL,
+  classifyGroqHttpFailure,
+  normalizeOutput,
+  createGroqProvider,
+};

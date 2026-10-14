@@ -13,6 +13,7 @@ describe('AIInteraction schema', () => {
     expect(AIInteraction.kinds).toEqual(['question', 'commentary', 'summary']);
     expect(AIInteraction.statuses).toEqual(['pending', 'completed', 'failed']);
     expect(attributes.userId.allowNull).toBe(true);
+    expect(attributes.visibility.validate.isIn[0]).toEqual(['public', 'private']);
     expect(attributes.question.allowNull).toBe(true);
     expect(attributes.answer.allowNull).toBe(true);
     expect(attributes.missingInformation.defaultValue).toEqual([]);

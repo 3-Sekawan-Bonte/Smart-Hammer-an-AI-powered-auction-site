@@ -28,12 +28,13 @@ async function harness(t, mutate = (db) => db) {
   const url = `http://127.0.0.1:${server.address().port}`;
   const request = (path, options = {}) => fetch(`${url}${path}`, { ...options, headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers } });
   const token = createMockAccessToken(1, secret);
+  const otherUserToken = createMockAccessToken(3, secret);
   const sellerToken = createMockAccessToken(2, secret);
   t.after(async () => {
     for (const active of [server]) if (active.listening) await new Promise((resolve) => active.io.close(resolve));
     await rm(directory, { recursive: true, force: true });
   });
-  return { server, databasePath, request, token, sellerToken, url };
+  return { server, databasePath, request, token, otherUserToken, sellerToken, url };
 }
 
 test('mock provider grounds missing facts and rejects unsafe structured output', async () => {
@@ -57,7 +58,7 @@ test('question returns pending 202, broadcasts lifecycle to joined clients, pers
     return db;
   });
   const a = socketClient(app.url, { auth: { token: app.token }, transports: ['websocket'], reconnection: false });
-  const b = socketClient(app.url, { auth: { token: app.token }, transports: ['websocket'], reconnection: false });
+  const b = socketClient(app.url, { auth: { token: app.otherUserToken }, transports: ['websocket'], reconnection: false });
   const otherRoom = socketClient(app.url, { auth: { token: app.token }, transports: ['websocket'], reconnection: false });
   t.after(() => {
     process.env.AI_MOCK_DELAY_MS = oldDelay;
@@ -66,30 +67,41 @@ test('question returns pending 202, broadcasts lifecycle to joined clients, pers
   await Promise.all([once(a, 'connect'), once(b, 'connect'), once(otherRoom, 'connect')]);
   for (const socket of [a, b]) await new Promise((resolve) => socket.emit('auction:join', { auctionId: 12 }, resolve));
   await new Promise((resolve) => otherRoom.emit('auction:join', { auctionId: 13 }, resolve));
-  const pendingA = once(a, 'ai:pending'); const pendingB = once(b, 'ai:pending');
-  const completeA = once(a, 'ai:message'); const completeB = once(b, 'ai:message');
-  let otherEvents = 0; otherRoom.on('ai:pending', () => { otherEvents += 1; });
+  const pendingA = once(a, 'ai:pending');
+  const completeA = once(a, 'ai:message');
+  let userBEvents = 0; b.on('ai:pending', () => { userBEvents += 1; }); b.on('ai:message', () => { userBEvents += 1; });
   const response = await app.request('/auctions/12/ai/questions', { method: 'POST', headers: { Authorization: `Bearer ${app.token}` }, body: JSON.stringify({ question: 'Apakah garansi masih ada?' }) });
   assert.equal(response.status, 202);
   const pending = (await response.json()).data.interaction;
   assert.equal(pending.status, 'pending');
   assert.equal(pending.sourceVersion, 3);
   assert.ok(pending.snapshotAt);
-  assert.equal((await pendingA).interaction.id, pending.id);
-  assert.equal((await pendingB).interaction.id, pending.id);
-  const [completedA, completedB] = await Promise.all([completeA, completeB]);
-  assert.equal(completedA.interaction.id, pending.id);
-  assert.equal(completedA.interaction.status, 'completed');
-  assert.equal(completedA.interaction.answer, completedB.interaction.answer);
-  assert.match(completedA.interaction.answer, /belum diverifikasi secara independen/);
-  assert.equal(completedA.version, undefined, 'AI event must not advance auction version');
+  assert.equal((await pendingA).data.interaction.id, pending.id);
+  const completedA = await completeA;
+  assert.equal(completedA.data.interaction.id, pending.id);
+  assert.equal(completedA.data.interaction.status, 'completed');
+  assert.match(completedA.data.interaction.answer, /belum diverifikasi secara independen/);
+  assert.equal(completedA.version, 3, 'AI event carries the source auction version without advancing it');
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.equal(otherEvents, 0);
   const history = await app.request('/auctions/12/ai/interactions?page=1&limit=20', { headers: { Authorization: `Bearer ${app.token}` } });
   const historyBody = await history.json();
-  assert.equal(historyBody.data.length, 1);
-  assert.equal(historyBody.data[0].status, 'completed');
-  assert.notEqual(historyBody.data[0].id, 89);
+  assert.equal(historyBody.data.filter((item) => item.kind === 'question').length, 1);
+  assert.equal(historyBody.data.find((item) => item.id === pending.id).status, 'completed');
+  assert.notEqual(historyBody.data.find((item) => item.kind === 'question').id, 89);
+  const otherHistory = await app.request('/auctions/12/ai/interactions', { headers: { Authorization: `Bearer ${app.otherUserToken}` } }).then((res) => res.json());
+  assert.equal(otherHistory.data.some((item) => item.kind === 'question'), false);
+  const publicSnapshot = await app.request('/auctions/12', { headers: { Authorization: `Bearer ${app.otherUserToken}` } }).then((res) => res.json());
+  assert.equal(publicSnapshot.data.aiInteractions.some((item) => item.kind === 'question'), false);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(userBEvents, 0);
+  const reconnect = socketClient(app.url, { auth: { token: app.token }, transports: ['websocket'], reconnection: false });
+  t.after(() => reconnect.disconnect());
+  await once(reconnect, 'connect');
+  const resyncSnapshot = once(reconnect, 'auction:snapshot');
+  await new Promise((resolve) => reconnect.emit('auction:join', { auctionId: 12 }, resolve));
+  assert.equal((await resyncSnapshot).aiInteractions.some((item) => item.kind === 'question'), false);
+  const recoveredHistory = await app.request('/auctions/12/ai/interactions', { headers: { Authorization: `Bearer ${app.token}` } }).then((res) => res.json());
+  assert.equal(recoveredHistory.data.some((item) => item.id === pending.id), true);
   const limited = await app.request('/auctions/12/ai/questions', { method: 'POST', headers: { Authorization: `Bearer ${app.token}` }, body: JSON.stringify({ question: 'Pertanyaan kedua' }) });
   assert.equal(limited.status, 429);
   assert.ok(Number(limited.headers.get('retry-after')) > 0);
@@ -127,7 +139,7 @@ test('provider failure is persisted and broadcast with a safe public error', asy
   const failedEvent = once(socket, 'ai:error');
   const response = await app.request('/auctions/12/ai/questions', { method: 'POST', headers: { Authorization: `Bearer ${app.token}` }, body: JSON.stringify({ question: 'Apakah produk masih tersedia?' }) });
   assert.equal(response.status, 202);
-  const { interaction } = await failedEvent;
+  const { data: { interaction } } = await failedEvent;
   assert.equal(interaction.status, 'failed');
   assert.equal(interaction.errorCode, 'AI_UNAVAILABLE');
   assert.equal(interaction.answer, null);
@@ -148,7 +160,7 @@ test('starting a draft emits a persisted mock Auctioneer commentary without chan
   const start = await app.request('/auctions/8/start', { method: 'POST', headers: { Authorization: `Bearer ${app.sellerToken}` } });
   assert.equal(start.status, 200);
   const version = (await start.json()).data.auction.version;
-  const { interaction } = await commentary;
+  const { data: { interaction } } = await commentary;
   assert.equal(interaction.kind, 'commentary');
   assert.equal(interaction.generatedBy, 'mock');
   assert.equal(interaction.sourceVersion, version);
@@ -159,11 +171,12 @@ test('starting a draft emits a persisted mock Auctioneer commentary without chan
 test('an accepted five-bid milestone produces one public commentary; ending produces final commentary', async (t) => {
   const app = await harness(t);
   const socket = socketClient(app.url, { auth: { token: app.token }, transports: ['websocket'], reconnection: false });
-  t.after(() => socket.disconnect());
-  await once(socket, 'connect');
-  await new Promise((resolve) => socket.emit('auction:join', { auctionId: 12 }, resolve));
-  let commentaryCount = 0;
-  socket.on('ai:message', (payload) => { if (payload.interaction.kind === 'commentary') commentaryCount += 1; });
+  const secondSocket = socketClient(app.url, { auth: { token: app.otherUserToken }, transports: ['websocket'], reconnection: false });
+  t.after(() => { socket.disconnect(); secondSocket.disconnect(); });
+  await Promise.all([once(socket, 'connect'), once(secondSocket, 'connect')]);
+  await Promise.all([socket, secondSocket].map((client) => new Promise((resolve) => client.emit('auction:join', { auctionId: 12 }, resolve))));
+  const commentaryCounts = [0, 0];
+  [socket, secondSocket].forEach((client, index) => client.on('ai:message', (payload) => { if (payload.data.interaction.kind === 'commentary') commentaryCounts[index] += 1; }));
   let amount = 1_000_000;
   for (let index = 0; index < 5; index += 1) {
     const snapshot = await app.request('/auctions/12', { headers: { Authorization: `Bearer ${app.token}` } });
@@ -173,16 +186,18 @@ test('an accepted five-bid milestone produces one public commentary; ending prod
     assert.equal(bid.status, 201);
   }
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.equal(commentaryCount, 1);
-  const finalCommentary = once(socket, 'ai:message');
+  assert.deepEqual(commentaryCounts, [1, 1]);
+  const finalCommentary = [once(socket, 'ai:message'), once(secondSocket, 'ai:message')];
   const ended = await app.request('/__mock/auctions/12/end', { method: 'POST', headers: { Authorization: `Bearer ${app.token}` } });
   assert.equal(ended.status, 200);
-  assert.equal((await finalCommentary).interaction.kind, 'commentary');
-  assert.equal(commentaryCount, 2);
+  const endedCommentary = await Promise.all(finalCommentary);
+  assert.equal(endedCommentary[0].data.interaction.kind, 'commentary');
+  assert.equal(endedCommentary[1].data.interaction.kind, 'commentary');
+  assert.deepEqual(commentaryCounts, [2, 2]);
 });
 
 test('older pending events cannot replace a completed public interaction', () => {
-  const base = { id: 1, auctionId: 12, visibility: 'public', status: 'completed', updatedAt: '2026-10-14T00:00:02Z' };
+  const base = { id: 1, auctionId: 12, kind: 'commentary', visibility: 'public', status: 'completed', updatedAt: '2026-10-14T00:00:02Z' };
   const older = { ...base, status: 'pending', updatedAt: '2026-10-14T00:00:01Z' };
   assert.equal(mergePublicInteractions([base], [older], 12)[0].status, 'completed');
 });
