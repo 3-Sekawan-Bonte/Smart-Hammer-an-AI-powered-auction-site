@@ -1,0 +1,200 @@
+{
+  "RENCANA_BIDWAR_AI_SAMPAI_KAMIS.md": {
+    "mtime": 1791872173.406988,
+    "seen": 1791872338.669704,
+    "ast_hash": "38a6df194e6a8f6b1e16ef2e78dc82e0",
+    "semantic_hash": ""
+  },
+  "site/.openai/hosting.json": {
+    "mtime": 1791868368.3841329,
+    "seen": 1791868624.2715986,
+    "ast_hash": "46e45de7374c4413973b8b13339e827e",
+    "semantic_hash": "46e45de7374c4413973b8b13339e827e"
+  },
+  "AGENTS.md": {
+    "mtime": 1791868013.9886107,
+    "seen": 1791868624.271602,
+    "ast_hash": "dc98b119aa66a89559c6fc2b82c00918",
+    "semantic_hash": "dc98b119aa66a89559c6fc2b82c00918"
+  },
+  "graphify-out/memory/query_20261013_050156_acb49a38_saya_bagian_buat_frotend_jadi_langkah_pertamanya_b.md": {
+    "mtime": 1791867716.8505356,
+    "seen": 1791868624.2716033,
+    "ast_hash": "da139aed2d8e20ec5f1fb9bb8184f3c2",
+    "semantic_hash": "da139aed2d8e20ec5f1fb9bb8184f3c2"
+  },
+  "graphify-out/memory/query_20261013_050814_92d0b01e_uinya_menurut_anda_bagusnya_gimana.md": {
+    "mtime": 1791868094.1915417,
+    "seen": 1791868624.2716043,
+    "ast_hash": "506efbd266ae1695f0f90851a5c5a47e",
+    "semantic_hash": "506efbd266ae1695f0f90851a5c5a47e"
+  },
+  "site/package.json": {
+    "mtime": 1791872307.2986112,
+    "seen": 1791872338.6696787,
+    "ast_hash": "51002ee8b3e54f2aa5c98d6d27926a8d",
+    "semantic_hash": ""
+  },
+  "site/src/App.jsx": {
+    "mtime": 1791873308.6228366,
+    "seen": 1791873431.7396111,
+    "ast_hash": "4b0496e1a30ccbe5b5f4edfb16961e56",
+    "semantic_hash": ""
+  },
+  "site/src/api/client.js": {
+    "mtime": 1791869901.5853162,
+    "seen": 1791869991.0207276,
+    "ast_hash": "f71a4918b3bff4e211cacf74e5fe8846",
+    "semantic_hash": ""
+  },
+  "site/src/components/AuctionCard.jsx": {
+    "mtime": 1791872985.13627,
+    "seen": 1791873016.8418674,
+    "ast_hash": "4b9fd2f9520644df2a889f22c241d1a6",
+    "semantic_hash": ""
+  },
+  "site/src/components/Countdown.jsx": {
+    "mtime": 1791868947.870294,
+    "seen": 1791869187.720887,
+    "ast_hash": "05719d49b043216a9a2cd1b4b58aca0b",
+    "semantic_hash": ""
+  },
+  "site/src/components/Icons.jsx": {
+    "mtime": 1791868947.7972906,
+    "seen": 1791869187.7208881,
+    "ast_hash": "afd8d6ee665d109397f3bfb901aa057f",
+    "semantic_hash": ""
+  },
+  "site/src/components/Layout.jsx": {
+    "mtime": 1791872485.2431216,
+    "seen": 1791872599.1353228,
+    "ast_hash": "1157673ebfdb55bbe29eef2ff27ee325",
+    "semantic_hash": ""
+  },
+  "site/src/contexts/AuctionContext.jsx": {
+    "mtime": 1791873423.759263,
+    "seen": 1791873431.7396188,
+    "ast_hash": "bf8d7da5df8abdeadc44248de717fa92",
+    "semantic_hash": ""
+  },
+  "site/src/contexts/AuthContext.jsx": {
+    "mtime": 1791869901.6133144,
+    "seen": 1791869991.0207367,
+    "ast_hash": "0c05dd6fda196d70ad386b4f084ecbd8",
+    "semantic_hash": ""
+  },
+  "site/src/contexts/SocketContext.jsx": {
+    "mtime": 1791869127.3580377,
+    "seen": 1791869187.720892,
+    "ast_hash": "31dbff8368cc59c0c167a100ab2cad91",
+    "semantic_hash": ""
+  },
+  "site/src/data/fixtures.js": {
+    "mtime": 1791872985.1062691,
+    "seen": 1791873016.841877,
+    "ast_hash": "002751ee7f2deb13f19ad93080198df3",
+    "semantic_hash": ""
+  },
+  "site/src/main.jsx": {
+    "mtime": 1791873308.592836,
+    "seen": 1791873431.7396238,
+    "ast_hash": "b0c8eb5104463070a7e1b57f16bb1b42",
+    "semantic_hash": ""
+  },
+  "site/src/pages/AuctionDetailPage.jsx": {
+    "mtime": 1791872985.196272,
+    "seen": 1791873016.8418791,
+    "ast_hash": "27dd8b4c88ccc70a848b73c65cf0c819",
+    "semantic_hash": ""
+  },
+  "site/src/pages/AuctionListPage.jsx": {
+    "mtime": 1791873367.3511057,
+    "seen": 1791873431.739626,
+    "ast_hash": "4642238a1abd4b492e7ee1b69a280c00",
+    "semantic_hash": ""
+  },
+  "site/src/pages/AuthPage.jsx": {
+    "mtime": 1791872307.354985,
+    "seen": 1791872338.6696975,
+    "ast_hash": "97691afba7c87055e1f15cd1b205ad34",
+    "semantic_hash": ""
+  },
+  "site/src/pages/CreateAuctionPage.jsx": {
+    "mtime": 1791873352.7047956,
+    "seen": 1791873431.739628,
+    "ast_hash": "5e21d12cec8e3afe5a165bf3c7ad2bec",
+    "semantic_hash": ""
+  },
+  "site/src/pages/NotFoundPage.jsx": {
+    "mtime": 1791868948.0353022,
+    "seen": 1791869187.7208974,
+    "ast_hash": "f90221f63d1d48147244912b6e052adf",
+    "semantic_hash": ""
+  },
+  "site/vite.config.js": {
+    "mtime": 1791869642.4550161,
+    "seen": 1791869672.7176673,
+    "ast_hash": "05950a871fff0c7747eed377e86b243a",
+    "semantic_hash": ""
+  },
+  "site/index.html": {
+    "mtime": 1791868947.3402681,
+    "seen": 1791869187.7209063,
+    "ast_hash": "661f78664b654ad93ba1253979111ca3",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1791869999.797614,
+    "seen": 1791872338.6696675,
+    "ast_hash": "136767738bb39642c96b2238d8aafd72",
+    "semantic_hash": ""
+  },
+  "site/mock/db.json": {
+    "mtime": 1791873392.0156188,
+    "seen": 1791873431.7396064,
+    "ast_hash": "5d078f126b02d73dc2360f9d9d67abbb",
+    "semantic_hash": ""
+  },
+  "site/src/components/ProtectedRoute.jsx": {
+    "mtime": 1791869901.674311,
+    "seen": 1791869991.0207345,
+    "ast_hash": "722117528b237ac475293f9e53b0a4e5",
+    "semantic_hash": ""
+  },
+  "site/mock/start.mjs": {
+    "mtime": 1791872307.3246112,
+    "seen": 1791872338.669677,
+    "ast_hash": "3e96a8feb8ec8a6b0468b25362dea4de",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261013_053951_f10335ba_jangan_yang_ke_backend_dulu_dan_ini_backendnya_pak.md": {
+    "mtime": 1791869991.138373,
+    "seen": 1791872338.669708,
+    "ast_hash": "33b6830bbb3291a37b5aad8baef8f444",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261013_062322_3e4a7d07_uinya_kurang_modern_sih_coba_anda_cari_lagi_yang_l.md": {
+    "mtime": 1791872602.6386106,
+    "seen": 1791873016.8418906,
+    "ast_hash": "f75541f6223fe6a02621d63e35e8f0be",
+    "semantic_hash": ""
+  },
+  "site/public/assets/auction-products-v2.png": {
+    "mtime": 1791872934.1670437,
+    "seen": 1791873016.841893,
+    "ast_hash": "92130203fee82cf7ab7672b2c3f68dfd",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261013_063016_4fd1f339_oke_langsung_lanjut_aja.md": {
+    "mtime": 1791873016.9652998,
+    "seen": 1791873431.7396493,
+    "ast_hash": "fafc8ca5ee26dd5d232dbe577202b70b",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20261013_063310_6cdaad00_terus_selanjutnya_buat_apa.md": {
+    "mtime": 1791873190.2409964,
+    "seen": 1791873431.7396517,
+    "ast_hash": "1a537b043908d11eba6a14f8d38d6f47",
+    "semantic_hash": ""
+  }
+}
