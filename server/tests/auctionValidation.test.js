@@ -38,9 +38,18 @@ describe('auction input validation', () => {
     [{ ...validInput, currentPrice: 2 }, 'currentPrice'],
     [{ ...validInput, extra: true }, 'extra'],
     [{ ...validInput, startingPrice: 2_000_000_001 }, 'startingPrice'],
-    [{ ...validInput, durationSeconds: 86401 }, 'durationSeconds'],
+    [{ ...validInput, durationSeconds: 604801 }, 'durationSeconds'],
   ])('rejects invalid values with field errors', (payload, field) => {
     expectValidationError(() => validateAuctionInput(payload), field);
+  });
+
+  test.each([86400, 259200, 604800])('accepts supported duration boundary %i seconds', (durationSeconds) => {
+    expect(validateAuctionInput({ ...validInput, durationSeconds }).durationSeconds).toBe(durationSeconds);
+  });
+
+  test('retains the 60-second minimum duration', () => {
+    expect(validateAuctionInput({ ...validInput, durationSeconds: 60 }).durationSeconds).toBe(60);
+    expectValidationError(() => validateAuctionInput({ ...validInput, durationSeconds: 59 }), 'durationSeconds');
   });
 
   test('validates partial updates without requiring omitted fields', () => {

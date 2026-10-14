@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { money } from './AuctionCard';
 import { ArrowIcon } from './Icons';
+import { AUCTION_DURATION_OPTIONS, auctionDurationLabel, auctionDurationSelection, isSupportedAuctionDuration, parseAuctionDuration } from '../features/auctions/auctionDuration';
 
 const emptyValues = {
   title: '',
@@ -10,7 +11,7 @@ const emptyValues = {
   imageUrl: '',
   startingPrice: '',
   minIncrement: '',
-  durationSeconds: '3600',
+  durationSeconds: String(AUCTION_DURATION_OPTIONS[0].seconds),
   specifications: '',
   defects: '',
   accessories: '',
@@ -27,7 +28,7 @@ function valuesFromAuction(auction) {
     imageUrl: auction?.imageUrl || '',
     startingPrice: String(auction?.startingPrice ?? ''),
     minIncrement: String(auction?.minIncrement ?? ''),
-    durationSeconds: String(auction?.durationSeconds ?? 3600),
+    durationSeconds: auctionDurationSelection(auction?.durationSeconds),
     specifications: facts.specifications || '',
     defects: facts.defects || '',
     accessories: Array.isArray(facts.accessories) ? facts.accessories.join('\n') : '',
@@ -42,7 +43,7 @@ function validate(values) {
   const imageUrl = values.imageUrl.trim();
   const startingPrice = Number(values.startingPrice);
   const minIncrement = Number(values.minIncrement);
-  const durationSeconds = Number(values.durationSeconds);
+  const durationSeconds = parseAuctionDuration(values.durationSeconds);
   const accessories = values.accessories.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
 
   if (title.length < 3 || title.length > 120) errors.title = 'Judul wajib 3–120 karakter.';
@@ -62,8 +63,8 @@ function validate(values) {
       errors[field] = 'Masukkan bilangan rupiah bulat antara 1 dan 2.000.000.000.';
     }
   }
-  if (!Number.isSafeInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 86400) {
-    errors.durationSeconds = 'Durasi harus 60–86400 detik.';
+  if (durationSeconds === null) {
+    errors.durationSeconds = 'Pilih durasi 1, 3, atau 7 hari.';
   }
   if (values.specifications.length > 2000) errors.specifications = 'Maksimal 2000 karakter.';
   if (values.defects.length > 1000) errors.defects = 'Maksimal 1000 karakter.';
@@ -188,9 +189,21 @@ export default function AuctionForm({
           {errorText('category')}
         </div>
         <div className="field">
-          <label htmlFor="auction-duration">Durasi lelang (detik)</label>
-          <input className="input" id="auction-duration" type="number" inputMode="numeric" min="60" max="86400" step="1" {...fieldProps('durationSeconds')} required />
-          <p className="helper">60 detik sampai 24 jam. Waktu mulai dan akhir ditetapkan server saat lelang dimulai.</p>
+          <label htmlFor="auction-duration">Durasi lelang</label>
+          <select
+            className="input"
+            id="auction-duration"
+            {...fieldProps('durationSeconds')}
+            value={isSupportedAuctionDuration(Number(values.durationSeconds)) ? values.durationSeconds : ''}
+            required
+          >
+            {AUCTION_DURATION_OPTIONS.map(({ label, seconds }) => <option key={seconds} value={seconds}>{label}</option>)}
+          </select>
+          <p className="helper">
+            {Number.isSafeInteger(Number(values.durationSeconds)) && !isSupportedAuctionDuration(Number(values.durationSeconds))
+              ? `Durasi draft saat ini: ${auctionDurationLabel(Number(values.durationSeconds))}. Pilih salah satu durasi di atas untuk menyimpan perubahan.`
+              : 'Waktu mulai dan akhir ditetapkan server saat lelang dimulai.'}
+          </p>
           {errorText('durationSeconds')}
         </div>
         <div className="field">

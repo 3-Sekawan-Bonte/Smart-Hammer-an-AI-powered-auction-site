@@ -17,7 +17,7 @@ class Auction extends Model {
       startingPrice: { type: DataTypes.INTEGER, allowNull: false },
       currentPrice: { type: DataTypes.INTEGER, allowNull: false },
       minIncrement: { type: DataTypes.INTEGER, allowNull: false },
-      durationSeconds: { type: DataTypes.INTEGER, allowNull: false },
+      durationSeconds: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 60, max: 604800 } },
       startsAt: { type: DataTypes.DATE, allowNull: true },
       endsAt: { type: DataTypes.DATE, allowNull: true },
       status: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'draft', validate: { isIn: [['draft', 'live', 'ended']] } },

@@ -55,6 +55,7 @@ User mengirim pertanyaan → backend mengambil fakta produk dan snapshot lelang 
 - `productFacts` mencakup spesifikasi, kekurangan/cacat, aksesori, dan garansi.
 - Kategori dipilih seller dari daftar subkategori elektronik: `smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`; backend memvalidasi nilai.
 - Hanya pemilik draft yang dapat mengedit, menghapus, atau memulai draft tersebut.
+- Durasi lelang dipilih melalui opsi 1, 3, atau 7 hari; API menyimpan durasi sebagai integer detik (`86400`, `259200`, `604800`). Backend menerima rentang 60–604800 detik dan mempertahankan minimum 60 detik.
 - Gambar memakai URL HTTPS; upload file tidak termasuk MVP.
 
 ### FR-03 — Status dan lifecycle lelang

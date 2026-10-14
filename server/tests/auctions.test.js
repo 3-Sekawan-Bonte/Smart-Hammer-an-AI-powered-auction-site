@@ -91,6 +91,12 @@ describe('auction authentication and creation', () => {
     expect(response.body.data.auction).toMatchObject({ currentPrice: input.startingPrice, status: 'draft', version: 0, startsAt: null, endsAt: null });
   });
 
+  test.each([86400, 259200, 604800])('creates a draft with duration %i seconds', async (durationSeconds) => {
+    const response = await createDraft(sellerToken, { ...input, durationSeconds });
+    expect(response.status).toBe(201);
+    expect(response.body.data.auction.durationSeconds).toBe(durationSeconds);
+  });
+
   test('validates required fields, title, description, condition, category, facts, image URL, prices, duration, and protected fields', async () => {
     const cases = [
       [{ ...input, title: undefined }, 'title'],
@@ -108,7 +114,7 @@ describe('auction authentication and creation', () => {
       [{ ...input, startingPrice: 2_000_000_001 }, 'startingPrice'],
       [{ ...input, minIncrement: 0 }, 'minIncrement'],
       [{ ...input, durationSeconds: 59 }, 'durationSeconds'],
-      [{ ...input, durationSeconds: 86401 }, 'durationSeconds'],
+      [{ ...input, durationSeconds: 604801 }, 'durationSeconds'],
       [{ ...input, status: 'live' }, 'status'],
       [{ ...input, unexpected: true }, 'unexpected'],
     ];
@@ -228,6 +234,15 @@ describe('auction start lifecycle', () => {
     expect(new Date(auction.startsAt).getTime()).toBeLessThanOrEqual(after);
     expect(new Date(auction.endsAt).getTime() - new Date(auction.startsAt).getTime()).toBe(input.durationSeconds * 1000);
     expect(auction.currentPrice).toBe(input.startingPrice);
+  });
+
+  test.each([86400, 259200, 604800])('starts a draft with a %i-second server deadline', async (durationSeconds) => {
+    const draft = await createRawAuction({ durationSeconds });
+    const response = await request(app).post(`/auctions/${draft.id}/start`).set(auth()).send({});
+    expect(response.status).toBe(200);
+    const auction = response.body.data.auction;
+    expect(auction.durationSeconds).toBe(durationSeconds);
+    expect(new Date(auction.endsAt).getTime() - new Date(auction.startsAt).getTime()).toBe(durationSeconds * 1000);
   });
 
   test('rejects non-owner, repeated starts, invalid state, and client lifecycle fields', async () => {
