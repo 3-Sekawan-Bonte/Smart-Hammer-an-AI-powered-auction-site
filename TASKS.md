@@ -121,13 +121,14 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Buat service provider AI backend.
 - [x] Buat `POST /auctions/:id/ai/questions` dengan validasi dan rate limit.
 - [x] Simpan interaction `pending` sebelum proses AI.
+- [x] Ikat setiap Product Q&A ke pemilik terautentikasi dan simpan sebagai `private`; Auctioneer commentary tetap `public`.
 - [x] Ambil product facts dan auction snapshot dari server.
 - [x] Batasi output dan validasi struktur JSON (`answer`, `missingInformation`).
 - [x] Simpan hasil `completed`/`failed` serta snapshot metadata.
-- [x] Buat `GET /auctions/:id/ai/interactions` untuk recovery/history.
-- [x] Broadcast `ai:pending`, `ai:message`, atau `ai:error`.
-- [ ] Bangun AIPanel frontend dengan status pending/completed/failed.
-- [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, dan rate limit.
+- [x] Batasi `GET /auctions/:id/ai/interactions` ke Q&A milik user aktif serta commentary publik, dengan pagination aman.
+- [x] Kirim event Q&A ke room Socket.IO per-user yang dibuat dari JWT; broadcast commentary Auctioneer hanya ke room auction.
+- [x] Bangun AIPanel dengan status pending/completed/failed, riwayat Q&A privat, commentary publik, dan pembersihan state saat logout/pergantian akun.
+- [x] Uji fakta yang tidak tersedia, prompt injection sederhana, timeout/provider failure, rate limit, privasi REST/Socket.IO, dan snapshot publik.
 
 **Checkpoint:** Q&A nyata berhasil, berbasis konteks server, tersimpan, dan kegagalannya tidak menghentikan bidding.
 
@@ -162,7 +163,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Integrasikan listing, pagination, pencarian, filter, detail, draft create/edit/delete, start, dan seller listing `seller=me`.
 - [x] Gunakan kategori backend yang diizinkan dan kirim field `category` dari form.
 - [x] Cocokkan respons bid/idempotency, tampilkan minimum bid dari state backend, dan sediakan `GET /auctions/:id/bids` terpaginasikan tanpa membocorkan idempotency key.
-- [x] Cocokkan Product Q&A dan riwayat AI dengan API serta bentuk user/interaksi backend.
+- [x] Cocokkan Product Q&A dan riwayat AI dengan API; Q&A privat per pemilik, sedangkan commentary Auctioneer tetap publik.
 - [x] Konfigurasikan URL API/Socket.IO frontend, CORS Express, dan CORS Socket.IO memakai origin yang dikonfigurasi.
 
 ### Realtime integration and verification

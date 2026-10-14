@@ -1,4 +1,5 @@
 const HttpError = require('../utils/httpError');
+const { Op } = require('sequelize');
 const { createAIQuestionRateLimiter } = require('./aiQuestionRateLimiter');
 const { createGroqProvider } = require('./groqProvider');
 
@@ -76,7 +77,7 @@ function createAIInteractionService({
 
   function publish(event, interaction, message) {
     try {
-      eventPublisher?.publishAIInteraction(event, {
+      eventPublisher?.publishPrivateAIInteraction(interaction.userId, event, {
         auctionId: interaction.auctionId,
         version: interaction.sourceVersion,
         interaction: interactionToJSON(interaction),
@@ -108,7 +109,7 @@ function createAIInteractionService({
       auctionId,
       userId,
       kind: 'question',
-      visibility: 'public',
+      visibility: 'private',
       question,
       answer: null,
       missingInformation: [],
@@ -153,7 +154,13 @@ function createAIInteractionService({
   async function list(userId, auctionId, { page, limit }) {
     await getAccessibleAuction(auctionId, userId);
     const { count, rows } = await AIInteraction.findAndCountAll({
-      where: { auctionId, visibility: 'public' },
+      where: {
+        auctionId,
+        [Op.or]: [
+          { kind: 'commentary', visibility: 'public' },
+          { kind: 'question', visibility: 'private', userId },
+        ],
+      },
       include: User ? [{ model: User, as: 'user', attributes: ['id', 'username'], required: false }] : [],
       order: [['createdAt', 'DESC'], ['id', 'DESC']],
       limit,

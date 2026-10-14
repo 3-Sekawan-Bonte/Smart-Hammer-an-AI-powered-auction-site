@@ -263,8 +263,10 @@ test('bids and asynchronous AI questions are accepted through the mock REST API'
   const body = await snapshot.json();
   assert.equal(body.data.auction.bidCount, 1);
   assert.equal(body.data.bids[0].amount, 2100000);
-  assert.equal(body.data.aiInteractions.length, 1);
-  assert.equal(body.data.aiInteractions[0].id, aiBody.id);
+  assert.equal(body.data.aiInteractions.some((item) => item.kind === 'question'), false);
+  const history = await request('/auctions/12/ai/interactions', { headers: auth(token) });
+  const interactions = (await history.json()).data;
+  assert.equal(interactions.some((item) => item.id === aiBody.id && item.visibility === 'private'), true);
 });
 
 test('draft PATCH enforces owner and draft state, replaces product facts, and start is one-time', async (t) => {

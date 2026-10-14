@@ -11,7 +11,7 @@ class AIInteraction extends Model {
       userId: { type: DataTypes.INTEGER, allowNull: true },
       kind: { type: DataTypes.STRING(20), allowNull: false, validate: { isIn: [kinds] } },
       triggerKey: { type: DataTypes.STRING(100), allowNull: true },
-      visibility: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'public', validate: { isIn: [['public']] } },
+      visibility: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'public', validate: { isIn: [['public', 'private']] } },
       question: { type: DataTypes.STRING(500), allowNull: true },
       answer: { type: DataTypes.TEXT, allowNull: true },
       missingInformation: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },

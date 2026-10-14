@@ -34,6 +34,7 @@ function createSocketServer(httpServer, dependencies, options = {}) {
   });
 
   io.on('connection', (socket) => {
+    socket.join(`user:${socket.data.user.id}`);
     socket.on('disconnect', () => {
       delete socket.data.user;
     });
@@ -55,7 +56,7 @@ function createSocketServer(httpServer, dependencies, options = {}) {
           offset: 0,
         });
         const aiResult = AIInteraction ? await AIInteraction.findAndCountAll({
-          where: { auctionId: payload.auctionId, visibility: 'public' },
+          where: { auctionId: payload.auctionId, kind: 'commentary', visibility: 'public' },
           include: User ? [{ model: User, as: 'user', attributes: ['id', 'username'], required: false }] : [],
           order: [['createdAt', 'DESC'], ['id', 'DESC']],
           limit: 20,

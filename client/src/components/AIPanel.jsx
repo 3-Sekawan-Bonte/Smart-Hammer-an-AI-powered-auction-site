@@ -27,10 +27,10 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
   const canAsk = Boolean(user && activeId === id && ['live', 'ended'].includes(currentStatus));
 
   useEffect(() => {
-    if (activeId === id && !meta && !Number(interactions.length)) {
+    if (activeId === id && user) {
       dispatch(loadAIInteractions({ auctionId: id, page: 1 })).unwrap().catch(() => setHistoryError(true));
     }
-  }, [dispatch, id, activeId, meta, interactions.length]);
+  }, [dispatch, id, activeId, user?.id]);
 
   useEffect(() => {
     if (!pending || connectionStatus === 'connected' || !user || activeId !== id) return undefined;
@@ -41,9 +41,9 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
   }, [dispatch, id, activeId, pending, connectionStatus, user]);
 
   useEffect(() => {
-    if (!pending || connectionStatus !== 'connected' || !user || activeId !== id) return;
+    if (connectionStatus !== 'connected' || !user || activeId !== id) return;
     dispatch(loadAIInteractions({ auctionId: id, page: 1 })).unwrap().catch(() => setHistoryError(true));
-  }, [dispatch, id, activeId, pending, connectionStatus, user]);
+  }, [dispatch, id, activeId, connectionStatus, user?.id]);
 
   useEffect(() => {
     if (!cooldownUntil) return undefined;
@@ -71,7 +71,7 @@ export default function AIPanel({ auctionId, status, auctionVersion = null }) {
     } finally { setSending(false); }
   }
 
-  const ordered = [...interactions].filter((item) => item.visibility === 'public').reverse();
+  const ordered = [...interactions].reverse();
   return <section className="ai-panel card-panel" aria-labelledby="ai-panel-title">
     <header className="ai-panel-header"><div className="ai-avatar" aria-hidden="true">✦</div><div><p className="eyebrow">Smart Hammer AI</p><h2 id="ai-panel-title">AI Auctioneer</h2><p className="ai-panel-intro">Tanyakan detail produk atau lihat komentar lelang dari data yang tersedia.</p></div></header>
     <div className="ai-disclosure">Jawaban AI merujuk pada informasi penjual dan snapshot lelang. Informasi produk belum diverifikasi secara independen.</div>

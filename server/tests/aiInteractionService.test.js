@@ -63,7 +63,8 @@ describe('AI interaction service', () => {
 
   test('broadcasts each Q&A state only after persistence to the corresponding auction room publisher', async () => {
     const timeline = [];
-    const eventPublisher = { publishAIInteraction: jest.fn((event, payload) => {
+    const eventPublisher = { publishPrivateAIInteraction: jest.fn((userId, event, payload) => {
+      expect(userId).toBe(22);
       timeline.push(`publish:${event}:${payload.interaction.status}`);
       expect(payload.auctionId).toBe(9);
       expect(payload.version).toBe(7);
@@ -89,27 +90,42 @@ describe('AI interaction service', () => {
     };
     const record = await state.service.ask(22, 9, 'Apa kondisinya?');
     expect(record.status).toBe('completed');
-    expect(eventPublisher.publishAIInteraction.mock.calls.map(([event]) => event)).toEqual(['ai:pending', 'ai:message']);
+    expect(eventPublisher.publishPrivateAIInteraction.mock.calls.map(([, event]) => event)).toEqual(['ai:pending', 'ai:message']);
     expect(timeline).toEqual([
       'persist:pending', 'publish:ai:pending:pending', 'provider', 'persist:completed', 'publish:ai:message:completed',
     ]);
-    expect(eventPublisher.publishAIInteraction.mock.calls[0][1]).toEqual(expect.objectContaining({
+    expect(eventPublisher.publishPrivateAIInteraction.mock.calls[0][2]).toEqual(expect.objectContaining({
       auctionId: 9, version: 7, interaction: expect.objectContaining({ status: 'pending', kind: 'question' }),
     }));
   });
 
+  test('does not call Groq or publish events when pending private Q&A persistence fails', async () => {
+    const provider = { answerQuestion: jest.fn() };
+    const eventPublisher = { publishPrivateAIInteraction: jest.fn() };
+    const state = setup({ provider, eventPublisher });
+    const databaseError = Object.assign(new Error('private visibility constraint'), { name: 'SequelizeDatabaseError' });
+    state.AIInteraction.create = jest.fn(async () => { throw databaseError; });
+
+    await expect(state.service.ask(22, 9, 'Apakah ada garansi?')).rejects.toBe(databaseError);
+    expect(state.AIInteraction.create).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'question', visibility: 'private', userId: 22, status: 'pending',
+    }));
+    expect(provider.answerQuestion).not.toHaveBeenCalled();
+    expect(eventPublisher.publishPrivateAIInteraction).not.toHaveBeenCalled();
+  });
+
   test('persists handled provider failure as failed without storing a fabricated answer', async () => {
     const provider = { answerQuestion: jest.fn(async () => { throw Object.assign(new Error('private details'), { code: 'AI_TIMEOUT' }); }) };
-    const eventPublisher = { publishAIInteraction: jest.fn() };
+    const eventPublisher = { publishPrivateAIInteraction: jest.fn() };
     const { service, records } = setup({ provider, eventPublisher });
     await expect(service.ask(22, 9, 'Apakah ada garansi?')).rejects.toMatchObject({ status: 503, code: 'AI_UNAVAILABLE' });
     expect(records[0]).toMatchObject({ status: 'failed', answer: null, missingInformation: [], errorCode: 'AI_TIMEOUT' });
-    expect(eventPublisher.publishAIInteraction.mock.calls.map(([event]) => event)).toEqual(['ai:pending', 'ai:error']);
-    expect(eventPublisher.publishAIInteraction.mock.calls[1][1]).toEqual(expect.objectContaining({
+    expect(eventPublisher.publishPrivateAIInteraction.mock.calls.map(([, event]) => event)).toEqual(['ai:pending', 'ai:error']);
+    expect(eventPublisher.publishPrivateAIInteraction.mock.calls[1][2]).toEqual(expect.objectContaining({
       auctionId: 9, version: 7, interaction: expect.objectContaining({ status: 'failed', errorCode: 'AI_TIMEOUT' }),
       message: 'The AI answer service is temporarily unavailable.',
     }));
-    expect(JSON.stringify(eventPublisher.publishAIInteraction.mock.calls)).not.toContain('private details');
+    expect(JSON.stringify(eventPublisher.publishPrivateAIInteraction.mock.calls)).not.toContain('private details');
   });
 
   test('persists safe Groq failure categories and logs only category and HTTP status', async () => {
@@ -126,7 +142,7 @@ describe('AI interaction service', () => {
   });
 
   test('publisher failures do not invalidate persisted Q&A success or failure', async () => {
-    const eventPublisher = { publishAIInteraction: jest.fn(() => { throw new Error('socket internals'); }) };
+    const eventPublisher = { publishPrivateAIInteraction: jest.fn(() => { throw new Error('socket internals'); }) };
     const success = setup({ eventPublisher, provider: { answerQuestion: async () => ({ answer: 'Jawaban.', missingInformation: [] }) } });
     await expect(success.service.ask(22, 9, 'Pertanyaan?')).resolves.toMatchObject({ status: 'completed' });
 
@@ -154,11 +170,11 @@ describe('AI interaction service', () => {
     expect(draft.records).toHaveLength(0);
   });
 
-  test('history is public-only, paginated, stable, and omits private profile fields', async () => {
+  test('history scopes private questions to their owner and includes only public commentary', async () => {
     const { service, AIInteraction } = setup();
     const interaction = {
       id: 4, auctionId: 9, userId: 22, user: { id: 22, username: 'buyer', email: 'private@example.test' },
-      kind: 'question', visibility: 'public', question: 'Pertanyaan?', answer: 'Jawaban.',
+      kind: 'question', visibility: 'private', question: 'Pertanyaan?', answer: 'Jawaban.',
       missingInformation: [], status: 'completed', sourceVersion: 7,
       snapshotAt: new Date('2026-10-14T12:00:00Z'), createdAt: new Date('2026-10-14T12:00:01Z'), updatedAt: new Date('2026-10-14T12:00:02Z'),
       toJSON() { return this; },
@@ -168,7 +184,14 @@ describe('AI interaction service', () => {
       return { count: 1, rows: [interaction] };
     };
     const result = await service.list(22, 9, { page: 1, limit: 10 });
-    expect(AIInteraction.lastQuery).toMatchObject({ where: { auctionId: 9, visibility: 'public' }, order: [['createdAt', 'DESC'], ['id', 'DESC']], limit: 10, offset: 0 });
+    expect(AIInteraction.lastQuery.where).toMatchObject({ auctionId: 9 });
+    const privateClause = AIInteraction.lastQuery.where[require('sequelize').Op.or];
+    expect(privateClause).toEqual([
+      { kind: 'commentary', visibility: 'public' },
+      { kind: 'question', visibility: 'private', userId: 22 },
+    ]);
+    expect(AIInteraction.lastQuery).toMatchObject({ order: [['createdAt', 'DESC'], ['id', 'DESC']], limit: 10, offset: 0 });
+    expect(result.rows[0].visibility).toBe('private');
     const safe = interactionToJSON(result.rows[0]);
     expect(safe.user).toEqual({ id: 22, username: 'buyer' });
     expect(JSON.stringify(safe)).not.toContain('private@example.test');

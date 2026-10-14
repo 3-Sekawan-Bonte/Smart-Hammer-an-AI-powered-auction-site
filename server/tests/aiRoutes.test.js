@@ -1,6 +1,7 @@
 const express = require('express');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
 const { createAuctionRoutes } = require('../src/routes/auctionRoutes');
 const { notFound, errorHandler } = require('../src/middleware/errorHandler');
 
@@ -9,7 +10,8 @@ const secret = 'ai-routes-test-secret';
 function setup({ status = 'live', provider } = {}) {
   const records = [];
   const user = { id: 10, username: 'buyer', email: 'buyer@example.test' };
-  const User = { async findByPk(id) { return id === user.id ? user : null; } };
+  const otherUser = { id: 11, username: 'other', email: 'other@example.test' };
+  const User = { async findByPk(id) { return [user, otherUser].find((entry) => entry.id === Number(id)) || null; } };
   const Auction = {
     async findByPk(id) {
       if (id !== 5) return null;
@@ -26,7 +28,13 @@ function setup({ status = 'live', provider } = {}) {
       records.push(record);
       return record;
     },
-    async findAndCountAll() { return { count: records.length, rows: records }; },
+    async findAndCountAll(options) {
+      const branches = options.where[Op.or];
+      const matched = records.filter((record) => Number(record.auctionId) === Number(options.where.auctionId) && branches.some((branch) =>
+        Object.entries(branch).every(([key, value]) => Number.isInteger(value) ? Number(record[key]) === value : record[key] === value)));
+      matched.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt) || b.id - a.id);
+      return { count: matched.length, rows: matched.slice(options.offset, options.offset + options.limit) };
+    },
   };
   const dependencies = {
     User, Auction, AIInteraction,
@@ -41,7 +49,8 @@ function setup({ status = 'live', provider } = {}) {
   app.use(notFound);
   app.use(errorHandler);
   const token = jwt.sign({ sub: String(user.id) }, secret, { expiresIn: '1h' });
-  return { app, token, provider: dependencies.provider, records };
+  const otherToken = jwt.sign({ sub: String(otherUser.id) }, secret, { expiresIn: '1h' });
+  return { app, token, otherToken, provider: dependencies.provider, records };
 }
 
 describe('AI Product Q&A endpoints', () => {
@@ -93,7 +102,7 @@ describe('AI Product Q&A endpoints', () => {
     expect(provider.answerQuestion).toHaveBeenCalledTimes(1);
   });
 
-  test('returns public interaction history with pagination metadata', async () => {
+  test('returns only the authenticated owner’s private Q&A and public commentary with pagination metadata', async () => {
     const { app, token } = setup();
     const result = await request(app)
       .get('/auctions/5/ai/interactions?page=1&limit=5')
@@ -104,6 +113,22 @@ describe('AI Product Q&A endpoints', () => {
       data: [],
       meta: { page: 1, limit: 5, total: 0, totalPages: 0 },
     });
+  });
+
+  test('another user cannot retrieve private questions or answers through history or an interaction URL', async () => {
+    const { app, token, otherToken, records } = setup();
+    const created = await request(app).post('/auctions/5/ai/questions').set('Authorization', `Bearer ${token}`).send({ question: 'Is there a warranty?' }).expect(202);
+    const interactionId = created.body.data.interaction.id;
+    expect(records[0]).toMatchObject({ userId: 10, visibility: 'private', kind: 'question' });
+    records.push({ id: 99, auctionId: 5, userId: 11, kind: 'question', visibility: 'private', question: 'Other question', answer: 'Other answer', status: 'completed', sourceVersion: 4, snapshotAt: new Date('2026-10-14T00:00:00Z'), createdAt: new Date('2026-10-14T00:00:03Z'), updatedAt: new Date('2026-10-14T00:00:03Z') });
+    const ownerHistory = await request(app).get('/auctions/5/ai/interactions?page=1&limit=1').set('Authorization', `Bearer ${token}`).expect(200);
+    expect(ownerHistory.body.data.map(({ id }) => id)).toContain(interactionId);
+    const otherHistory = await request(app).get('/auctions/5/ai/interactions').set('Authorization', `Bearer ${otherToken}`).expect(200);
+    expect(otherHistory.body.data.map(({ id }) => id)).toEqual([99]);
+    const ownerSecondPage = await request(app).get('/auctions/5/ai/interactions?page=2&limit=1').set('Authorization', `Bearer ${token}`).expect(200);
+    expect(ownerSecondPage.body.data).toEqual([]);
+    await request(app).get(`/auctions/5/ai/interactions/${interactionId}`).set('Authorization', `Bearer ${otherToken}`).expect(404);
+    await request(app).get('/auctions/5/ai/interactions?userId=10').set('Authorization', `Bearer ${otherToken}`).expect(400);
   });
 
   test('rejects history query parameters outside the documented pagination contract', async () => {

@@ -125,14 +125,14 @@ test('real Socket.IO validates sessions, authorizes rooms, broadcasts to two cli
     const result = await app.request(`/__mock/auctions/12/${route}`, { method: 'POST', headers: { Authorization: `Bearer ${buyerToken}` } });
     assert.equal(result.status, 200);
     const [a, b] = await Promise.all([receivedA, receivedB]);
-    assert.equal(a.interaction.id, b.interaction.id);
-    assert.equal(a.interaction.visibility, 'public');
+    assert.equal(a.data.interaction.id, b.data.interaction.id);
+    assert.equal(a.data.interaction.visibility, 'private');
     if (route === 'ai-message') {
-      assert.match(a.interaction.answer, /simulasi lokal/);
-      assert.equal(a.interaction.id, priorPendingInteractionId);
+      assert.match(a.data.interaction.answer, /simulasi lokal/);
+      assert.equal(a.data.interaction.id, priorPendingInteractionId);
     }
-    if (route === 'ai-error') assert.equal(a.interaction.errorCode, 'AI_UNAVAILABLE');
-    if (route === 'ai-pending') priorPendingInteractionId = a.interaction.id;
+    if (route === 'ai-error') assert.equal(a.data.interaction.errorCode, 'AI_UNAVAILABLE');
+    if (route === 'ai-pending') priorPendingInteractionId = a.data.interaction.id;
   }
 
   const privateSnapshot = once(seller, 'auction:snapshot');

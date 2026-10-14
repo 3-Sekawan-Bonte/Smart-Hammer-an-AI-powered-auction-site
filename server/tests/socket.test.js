@@ -39,10 +39,11 @@ function setup() {
   const User = { async findByPk(id) { return id > 0 ? { id, username: id === 7 ? 'seller' : 'buyer' } : null; } };
   const Auction = { async findByPk(id) { return id === auction.id ? auction : null; } };
   const Bid = { async findAndCountAll() { return { count: 0, rows: [] }; } };
+  const AIInteraction = { async findAndCountAll(options) { AIInteraction.lastQuery = options; return { count: 0, rows: [] }; } };
   const sequelize = { async transaction(callback) { return callback({ LOCK: { UPDATE: 'UPDATE' } }); } };
   const server = http.createServer();
-  const io = createSocketServer(server, { User, Auction, Bid, sequelize }, { env: { JWT_SECRET: secret } });
-  return { server, io, auction };
+  const io = createSocketServer(server, { User, Auction, Bid, AIInteraction, sequelize }, { env: { JWT_SECRET: secret } });
+  return { server, io, auction, AIInteraction };
 }
 
 async function start(server) {
@@ -142,5 +143,36 @@ describe('Socket.IO auction synchronization', () => {
     await expect(emitAck(client, 'auction:join', { auctionId: 12 })).resolves.toMatchObject({ ok: false, error: { code: 'NOT_FOUND' } });
     expect(io.sockets.sockets.get(client.id).rooms.has('auction:12')).toBe(false);
     client.disconnect();
+  });
+
+  test('authenticated sockets join trusted per-user rooms and public snapshots select commentary only', async () => {
+    const state = setup();
+    ({ server, io } = state);
+    url = await start(server);
+    const tokenA = jwt.sign({ sub: '8' }, secret, { expiresIn: '1h' });
+    const tokenB = jwt.sign({ sub: '9' }, secret, { expiresIn: '1h' });
+    const { client: a, connected: connectedA } = connect(url, tokenA);
+    const { client: b, connected: connectedB } = connect(url, tokenB);
+    await Promise.all([connectedA, connectedB]);
+    const snapA = new Promise((resolve) => a.once('auction:snapshot', resolve));
+    const snapB = new Promise((resolve) => b.once('auction:snapshot', resolve));
+    await Promise.all([emitAck(a, 'auction:join', { auctionId: 12 }), emitAck(b, 'auction:join', { auctionId: 12 })]);
+    await Promise.all([snapA, snapB]);
+    const questionWhere = state.AIInteraction.lastQuery.where;
+    expect(questionWhere).toMatchObject({ auctionId: 12, kind: 'commentary', visibility: 'public' });
+    const socketA = io.sockets.sockets.get(a.id);
+    const socketB = io.sockets.sockets.get(b.id);
+    expect(socketA.rooms.has('user:8')).toBe(true);
+    expect(socketB.rooms.has('user:9')).toBe(true);
+    expect(socketA.rooms.has('user:9')).toBe(false);
+    const receivedA = new Promise((resolve) => a.once('ai:message', resolve));
+    let leakedToB = false;
+    b.once('ai:message', () => { leakedToB = true; });
+    io.to('user:8').emit('ai:message', { auctionId: 12, version: 3, data: { interaction: { id: 3, userId: 8, kind: 'question', visibility: 'private', status: 'completed' } } });
+    expect((await receivedA).data.interaction.userId).toBe(8);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(leakedToB).toBe(false);
+    await expect(emitAck(a, 'auction:join', { auctionId: 12, userId: 9 })).resolves.toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
+    a.disconnect(); b.disconnect();
   });
 });

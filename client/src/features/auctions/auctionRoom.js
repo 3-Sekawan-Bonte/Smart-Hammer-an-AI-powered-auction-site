@@ -22,7 +22,7 @@ export function validateSnapshot(snapshot, requestedId) {
     ...snapshot,
     auction: { ...auction, version: Number(auction.version) },
     bids: snapshot.bids || [],
-    aiInteractions: (snapshot.aiInteractions || []).filter((item) => item?.visibility === 'public'),
+    aiInteractions: (snapshot.aiInteractions || []).filter((item) => item?.kind === 'commentary' && item?.visibility === 'public'),
   };
 }
 
@@ -47,10 +47,10 @@ export function mergeBids(existing = [], incoming = [], auctionId) {
 
 export function mergePublicInteractions(existing = [], incoming = [], auctionId) {
   const byId = new Map(existing
-    .filter((item) => item?.id != null && sameId(item.auctionId, auctionId) && item.visibility === 'public')
+    .filter((item) => item?.id != null && sameId(item.auctionId, auctionId) && item.kind === 'commentary' && item.visibility === 'public')
     .map((item) => [String(item.id), item]));
   for (const item of incoming) {
-    if (!item || item.id == null || !sameId(item.auctionId, auctionId) || item.visibility !== 'public') continue;
+    if (!item || item.id == null || !sameId(item.auctionId, auctionId) || item.kind !== 'commentary' || item.visibility !== 'public') continue;
     const previous = byId.get(String(item.id));
     if (!previous) { byId.set(String(item.id), item); continue; }
     const oldTime = Date.parse(previous.updatedAt || previous.createdAt || '') || 0;
