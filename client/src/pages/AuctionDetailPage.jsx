@@ -1,22 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { loadAuctionSnapshot, selectActiveAuction, selectActiveLoading, selectActiveError, selectActiveId, selectServerNow, selectStartStatus, startAuction } from '../features/auctions/auctionSlice';
+import { loadAuctionSnapshot, selectActiveAuction, selectActiveLoading, selectActiveError, selectActiveId, selectServerNow, selectServerTimeOffsetMs, selectStartStatus, startAuction } from '../features/auctions/auctionSlice';
 import { selectUser } from '../features/auth/authSlice';
 import { selectConnectionStatus, selectRoomError, selectRoomStatus } from '../features/socket/socketSlice';
 import { money } from '../components/AuctionCard';
 import BidForm from '../components/BidForm';
 import BidHistory from '../components/BidHistory';
+import Countdown from '../components/Countdown';
+import WinnerBanner, { getAuctionResultState } from '../components/WinnerBanner';
 
 export default function AuctionDetailPage() {
   const { id } = useParams(); const dispatch = useDispatch(); const location = useLocation();
-  const auction = useSelector(selectActiveAuction); const loading = useSelector(selectActiveLoading); const error = useSelector(selectActiveError); const activeId = useSelector(selectActiveId); const serverNow = useSelector(selectServerNow); const startStatus = useSelector(selectStartStatus); const user = useSelector(selectUser);
+  const auction = useSelector(selectActiveAuction); const loading = useSelector(selectActiveLoading); const error = useSelector(selectActiveError); const activeId = useSelector(selectActiveId); const serverNow = useSelector(selectServerNow); const serverTimeOffsetMs = useSelector(selectServerTimeOffsetMs); const startStatus = useSelector(selectStartStatus); const user = useSelector(selectUser);
   const [confirming, setConfirming] = useState(false); const [message, setMessage] = useState(location.state?.notice || '');
+  const [deadlinePending, setDeadlinePending] = useState(false);
   const cancelDialogRef = useRef(null);
+  const resultRefreshRef = useRef(null);
   const connectionStatus = useSelector(selectConnectionStatus);
   const roomStatus = useSelector(selectRoomStatus);
   const roomError = useSelector(selectRoomError);
   useEffect(() => { if (!id) return undefined; const request = dispatch(loadAuctionSnapshot(id)); return () => request.abort(); }, [id, dispatch]);
+  const refreshAfterDeadline = useCallback(() => dispatch(loadAuctionSnapshot(id)), [dispatch, id]);
+  const resultState = getAuctionResultState(auction);
+  useEffect(() => {
+    if (resultState.kind !== 'loading') { resultRefreshRef.current = null; return; }
+    const key = `${auction?.id}:${auction?.version}`;
+    if (resultRefreshRef.current === key) return;
+    resultRefreshRef.current = key;
+    dispatch(loadAuctionSnapshot(id));
+  }, [auction?.id, auction?.version, dispatch, id, resultState.kind]);
   useEffect(() => { setConfirming(false); setMessage(location.state?.notice || ''); }, [id, location.state]);
   useEffect(() => {
     if (!confirming) return undefined;
@@ -35,7 +48,7 @@ export default function AuctionDetailPage() {
   }, [confirming, startStatus]);
   if (loading || activeId !== id) return <div className="page container"><div className="loading-card">Memuat detail lelang…</div></div>;
   if (error || !auction) return <div className="page container"><section className="error-card page-state" role="alert"><p className="eyebrow">Detail lelang</p><h1 className="display">Lelang tidak tersedia.</h1><p>{typeof error === 'string' ? error : error?.message || 'Lelang ini tidak ditemukan atau kamu tidak memiliki akses.'}</p><Link className="btn btn-primary" to="/">Kembali ke daftar lelang</Link></section></div>;
-  const isOwner = Number(auction.seller?.id) === Number(user?.id); const isDraft = auction.status === 'draft'; const status = auction.status === 'live' && auction.endsAt && Date.parse(auction.endsAt) <= Date.parse(serverNow || new Date().toISOString()) ? 'ended' : auction.status;
+  const isOwner = Number(auction.seller?.id) === Number(user?.id); const isDraft = auction.status === 'draft'; const status = auction.status;
   async function handleStart() {
     setMessage('');
     try { const updated = await dispatch(startAuction(id)).unwrap(); setConfirming(false); setMessage('Lelang berhasil dimulai.'); dispatch(loadAuctionSnapshot(String(updated.id))); }
@@ -53,9 +66,11 @@ export default function AuctionDetailPage() {
       </div>
     </section><aside className="detail-side-card"><p className="eyebrow">Ringkasan lelang</p><div className="detail-price-block"><span>Harga {auction.bidCount ? 'saat ini' : 'awal'}</span><strong>{money(auction.currentPrice ?? auction.startingPrice)}</strong></div><dl className="detail-data"><div><dt>Harga awal</dt><dd>{money(auction.startingPrice)}</dd></div><div><dt>Minimum kenaikan</dt><dd>{money(auction.minIncrement)}</dd></div><div><dt>Status</dt><dd>{status === 'live' ? 'Sedang berlangsung' : status === 'ended' ? 'Berakhir' : 'Draft'}</dd></div><div><dt>Mulai</dt><dd>{formatWib(auction.startsAt) || 'Belum dimulai'}</dd></div><div><dt>Berakhir</dt><dd>{formatWib(auction.endsAt) || 'Ditentukan saat dimulai'}</dd></div><div><dt>Durasi</dt><dd>{formatDuration(auction.durationSeconds)}</dd></div></dl>
       {isOwner && isDraft && <div className="seller-actions"><Link className="btn btn-ghost" to={`/auctions/${auction.id}/edit`}>Edit draft</Link><button className="btn btn-primary" type="button" onClick={() => { setMessage(''); setConfirming(true); }}>Mulai lelang</button></div>}
-      {status === 'live' && <p className="detail-note">Harga dan deadline mengikuti data server. Bid dikirim melalui REST dan disinkronkan ke peserta room melalui Socket.IO.</p>}{status === 'ended' && <p className="detail-note">Hasil lelang mengikuti snapshot yang dikirim server.</p>}
+      {status === 'live' && <div className="countdown-card"><span className="eyebrow">Waktu tersisa</span><strong><Countdown endsAt={auction.endsAt} status={auction.status} serverNow={serverNow} serverTimeOffsetMs={serverTimeOffsetMs} onExpired={refreshAfterDeadline} onConfirmingChange={setDeadlinePending} /></strong><span className="countdown-caption">Deadline mengikuti waktu server dan dapat berubah saat bid diterima.</span></div>}
+      {isDraft && <p className="detail-note">Countdown dimulai setelah lelang dibuka oleh penjual.</p>}{status === 'ended' && <p className="detail-note">Hasil lelang mengikuti snapshot yang dikonfirmasi server.</p>}
     </aside></div>
-    <div className="bid-panels-grid"><BidForm auction={auction} user={user} /><BidHistory auctionId={auction.id} highestBidder={auction.highestBidder} /></div>
+    {status === 'ended' && <WinnerBanner auction={auction} user={user} />}
+    <div className="bid-panels-grid"><BidForm auction={auction} user={user} deadlinePending={deadlinePending} /><BidHistory auctionId={auction.id} highestBidder={auction.highestBidder} /></div>
     {confirming && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && startStatus !== 'loading') setConfirming(false); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="start-title"><p className="eyebrow">Konfirmasi</p><h2 id="start-title" className="display">Mulai lelang sekarang?</h2><p>Waktu mulai dan berakhir akan ditetapkan server. Setelah dimulai, detail draft tidak dapat diedit.</p>{message && <p className="form-error" role="alert">{message}</p>}<div className="dialog-actions"><button ref={cancelDialogRef} className="btn btn-ghost" type="button" onClick={() => setConfirming(false)} disabled={startStatus === 'loading'}>Kembali</button><button className="btn btn-primary" type="button" onClick={handleStart} disabled={startStatus === 'loading'}>{startStatus === 'loading' ? 'Memulai…' : 'Ya, mulai lelang'}</button></div></section></div>}
   </div></div>;
 }

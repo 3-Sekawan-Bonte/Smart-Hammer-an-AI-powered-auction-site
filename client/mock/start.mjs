@@ -331,20 +331,58 @@ function normalizeFacts(facts = {}) {
   };
 }
 
-export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret = defaultMockJwtSecret, environment = process.env.NODE_ENV } = {}) {
+function finalizeAuction(database, auction, now) {
+  const current = serializeAuction(database, auction);
+  auction.status = 'ended';
+  auction.winnerId = current.highestBidderId;
+  auction.updatedAt = now.toISOString();
+  auction.version = Number(auction.version ?? 0) + 1;
+  return {
+    auctionId: Number(auction.id),
+    serverNow: now.toISOString(),
+    version: auction.version,
+    auction: serializeAuction(database, auction),
+  };
+}
+
+export function createMockServer({
+  databasePath = defaultDatabasePath,
+  jwtSecret = defaultMockJwtSecret,
+  environment = process.env.NODE_ENV,
+  clock = () => Date.now(),
+  schedulerIntervalMs = 1000,
+} = {}) {
   let io;
-  let bidMutationQueue = Promise.resolve();
-  const serializeBidMutation = (operation) => {
-    const result = bidMutationQueue.then(operation, operation);
-    bidMutationQueue = result.catch(() => undefined);
+  let mutationQueue = Promise.resolve();
+  let scheduler = null;
+  let shutdown = false;
+  const nowDate = () => new Date(clock());
+  const serializeAuctionMutation = (operation) => {
+    const result = mutationQueue.then(operation, operation);
+    mutationQueue = result.catch(() => undefined);
     return result;
   };
+  const closeExpiredAuctions = ({ auctionId = null, force = false } = {}) => serializeAuctionMutation(async () => {
+    const database = await readDatabase(databasePath);
+    const now = nowDate();
+    const candidates = database.auctions.filter((auction) =>
+      (auctionId === null || Number(auction.id) === Number(auctionId)) &&
+      auction.status === 'live' &&
+      (force || (Number.isFinite(Date.parse(auction.endsAt)) && now.getTime() >= Date.parse(auction.endsAt)))
+    );
+    if (!candidates.length) return [];
+    const events = candidates.map((auction) => finalizeAuction(database, auction, now));
+    await saveDatabase(databasePath, database);
+    for (const event of events) io?.to(`auction:${event.auctionId}`).emit('auction:ended', event);
+    return events;
+  });
   const server = createServer(async (request, response) => {
     if (request.method === 'OPTIONS') return send(response, 204);
     try {
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
       const pathname = url.pathname;
-      const database = await readDatabase(databasePath);
+      await server.ready;
+      let database = await readDatabase(databasePath);
 
       if (pathname === '/users/register' && request.method === 'POST') {
         const body = await readBody(request);
@@ -401,7 +439,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         if (!auction) return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
         if (!io) return errorResponse(response, 503, 'MOCK_UNAVAILABLE', 'Socket.IO mock belum aktif.');
         const room = `auction:${id}`;
-        const now = new Date().toISOString();
+        const now = nowDate().toISOString();
         let eventName;
         let payload;
         if (scenario === 'bid' || scenario === 'duplicate-bid') {
@@ -430,17 +468,11 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
           return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, version: auction.version } });
         }
         if (scenario === 'end') {
-          if (auction.status === 'ended') return errorResponse(response, 409, 'AUCTION_ENDED', 'Lelang sudah berakhir.');
-          const currentAuction = serializeAuction(database, auction);
-          auction.status = 'ended';
-          auction.winnerId = currentAuction.highestBidderId;
-          auction.updatedAt = now;
-          auction.version = Number(auction.version ?? 0) + 1;
-          await saveDatabase(databasePath, database);
+          const events = await closeExpiredAuctions({ auctionId: id, force: true });
+          if (!events.length) return errorResponse(response, 409, 'AUCTION_ENDED', 'Lelang sudah berakhir.');
           eventName = 'auction:ended';
-          payload = { auctionId: id, version: auction.version, serverNow: now, auction: serializeAuction(database, auction) };
-          io.to(room).emit(eventName, payload);
-          return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, version: auction.version } });
+          payload = events[0];
+          return send(response, 200, { message: 'Simulasi development-only dikirim.', data: { event: eventName, version: payload.version } });
         }
         if (scenario === 'gap-event' || scenario === 'stale-event') {
           const version = Number(auction.version ?? 0) + (scenario === 'gap-event' ? 2 : -1);
@@ -570,7 +602,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         }
         if (Object.keys(fields).length) return errorResponse(response, 400, 'VALIDATION_ERROR', 'Data bid tidak valid.', fields);
 
-        const outcome = await serializeBidMutation(async () => {
+        const outcome = await serializeAuctionMutation(async () => {
           const latest = await readDatabase(databasePath);
           const bidder = latest.users.find((user) => Number(user.id) === Number(currentUser.id));
           if (!bidder) return { status: 401, code: 'UNAUTHORIZED', message: 'Silakan login untuk melanjutkan.' };
@@ -584,7 +616,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
             const originalAuction = latest.auctions.find((entry) => Number(entry.id) === auctionId);
             const originalBid = latest.bids.find((entry) => Number(entry.id) === Number(prior.bidId));
             if (!originalAuction || !originalBid) return { status: 404, code: 'NOT_FOUND', message: 'Lelang tidak ditemukan.' };
-            const serverNow = new Date().toISOString();
+            const serverNow = nowDate().toISOString();
             return {
               status: 200,
               message: 'Request bid sebelumnya sudah diterima.',
@@ -602,13 +634,9 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
           if (isOwner(auction, bidder)) return { status: 403, code: 'SELF_BID_FORBIDDEN', message: 'Pemilik lelang tidak dapat menawar lelangnya sendiri.' };
           if (auction.status === 'ended') return { status: 409, code: 'AUCTION_ENDED', message: 'Lelang sudah berakhir.' };
           if (auction.status !== 'live') return { status: 409, code: 'AUCTION_NOT_LIVE', message: 'Lelang belum berlangsung.' };
-          const now = new Date();
+          const now = nowDate();
           if (!auction.endsAt || !Number.isFinite(Date.parse(auction.endsAt)) || now.getTime() >= Date.parse(auction.endsAt)) {
-            const currentAuction = serializeAuction(latest, auction);
-            auction.status = 'ended';
-            auction.winnerId = currentAuction.highestBidderId;
-            auction.updatedAt = now.toISOString();
-            auction.version = Number(auction.version ?? 0) + 1;
+            const event = finalizeAuction(latest, auction, now);
             await saveDatabase(databasePath, latest);
             return {
               status: 409,
@@ -616,7 +644,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
               message: 'Waktu lelang sudah berakhir.',
               broadcast: true,
               eventName: 'auction:ended',
-              event: { auctionId, version: auction.version, serverNow: now.toISOString(), auction: serializeAuction(latest, auction) },
+              event,
             };
           }
           const currentAuction = serializeAuction(latest, auction);
@@ -680,7 +708,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
           else if (key !== 'category') auction[key] = body[key];
         }
         auction.currentPrice = auction.startingPrice;
-        auction.updatedAt = new Date().toISOString();
+        auction.updatedAt = nowDate().toISOString();
         auction.version = Number(auction.version ?? 0) + 1;
         await saveDatabase(databasePath, database);
         return send(response, 200, { message: 'Draft lelang diperbarui.', data: { auction: serializeAuction(database, auction) } });
@@ -693,7 +721,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         if (!auction) return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
         if (!isOwner(auction, currentUser)) return errorResponse(response, 403, 'FORBIDDEN', 'Hanya pemilik lelang yang dapat memulai lelang.');
         if (auction.status !== 'draft') return errorResponse(response, 409, 'AUCTION_NOT_DRAFT', 'Lelang sudah bukan draft dan tidak dapat dimulai ulang.');
-        const now = new Date();
+        const now = nowDate();
         auction.startsAt = now.toISOString();
         auction.endsAt = new Date(now.getTime() + Number(auction.durationSeconds) * 1000).toISOString();
         auction.status = 'live';
@@ -711,6 +739,8 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
       if (auctionMatch && request.method === 'GET') {
         const id = parseId(auctionMatch[1]);
         if (!id) return errorResponse(response, 400, 'VALIDATION_ERROR', 'ID lelang tidak valid.', { id: 'ID harus integer positif.' });
+        await closeExpiredAuctions({ auctionId: id });
+        database = await readDatabase(databasePath);
         const auction = database.auctions.find((entry) => Number(entry.id) === id);
         if (!auction || (auction.status === 'draft' && !isOwner(auction, currentUser))) {
           return errorResponse(response, 404, 'NOT_FOUND', 'Lelang tidak ditemukan.');
@@ -728,7 +758,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
         return send(response, 200, {
           message: 'Detail lelang berhasil diambil.',
           data: {
-            serverNow: new Date().toISOString(),
+            serverNow: nowDate().toISOString(),
             auction: serializeAuction(database, auction),
             bids: bidPage.data.map((bid) => serializeBid(database, bid)),
             aiInteractions: aiPage.data,
@@ -786,6 +816,16 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
     transports: ['websocket', 'polling'],
   });
   server.io = io;
+  server.closeExpiredAuctions = closeExpiredAuctions;
+  server.ready = Promise.resolve().then(() => closeExpiredAuctions());
+  server.on('listening', () => {
+    void server.ready.then(() => {
+      if (scheduler || shutdown) return;
+      scheduler = setInterval(() => { void closeExpiredAuctions().catch((error) => console.error(`Auction closure scan failed: ${error.message}`)); }, schedulerIntervalMs);
+      scheduler.unref?.();
+    }).catch((error) => console.error(`Auction startup recovery failed: ${error.message}`));
+  });
+  server.on('close', () => { shutdown = true; if (scheduler) clearInterval(scheduler); scheduler = null; });
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -810,6 +850,8 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
       const auctionId = parseId(String(payload.auctionId ?? ''));
       if (!auctionId) return acknowledge({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'Auction ID tidak valid.' } });
       try {
+        await server.ready;
+        await closeExpiredAuctions({ auctionId });
         const database = await readDatabase(databasePath);
         const auction = database.auctions.find((item) => Number(item.id) === auctionId);
         const user = database.users.find((item) => Number(item.id) === socket.data.userId);
@@ -818,7 +860,7 @@ export function createMockServer({ databasePath = defaultDatabasePath, jwtSecret
           return acknowledge({ ok: false, error: { code: 'NOT_FOUND', message: 'Auction unavailable.' } });
         }
         await socket.join(`auction:${auctionId}`);
-        socket.emit('auction:snapshot', buildAuctionSnapshot(database, auctionId));
+        socket.emit('auction:snapshot', { ...buildAuctionSnapshot(database, auctionId), serverNow: nowDate().toISOString() });
         acknowledge({ ok: true, data: { auctionId } });
       } catch {
         acknowledge({ ok: false, error: { code: 'MOCK_UNAVAILABLE', message: 'Snapshot lelang tidak tersedia.' } });
@@ -847,7 +889,7 @@ export function startMockServer({ port = defaultPort, host = '127.0.0.1', databa
   server.listen(port, host, () => {
     console.log(`Smart Hammer MOCK API (development only) berjalan di http://${host}:${port}`);
     console.log(`Socket.IO tersedia di http://${host}:${port}/socket.io; data tersimpan lokal di ${databasePath}.`);
-    console.log('Bidding/AI yang tersedia hanya simulasi development melalui endpoint /__mock; bukan backend produksi.');
+    console.log('Bid REST dan closure bekerja pada mock development; endpoint /__mock hanya kontrol QA. AI belum tersedia; tidak ada backend produksi.');
   });
   const shutdown = () => server.io.close(() => { process.exitCode = 0; });
   process.once('SIGINT', shutdown);

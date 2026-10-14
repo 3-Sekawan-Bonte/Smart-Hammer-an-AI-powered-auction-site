@@ -6,7 +6,7 @@ import { selectAuthRestoring } from '../features/auth/authSlice.js';
 import { formatRupiah, getBidAvailability, parseBidAmount } from '../features/auctions/bidUtils.js';
 import { clearPendingBidIntent, createBidIntent, getPendingBidIntent, savePendingBidIntent } from '../features/auctions/bidIntent.js';
 
-export default function BidForm({ auction, user }) {
+export default function BidForm({ auction, user, deadlinePending = false }) {
   const dispatch = useDispatch();
   const store = useStore();
   const activeId = useSelector(selectActiveId);
@@ -97,7 +97,7 @@ export default function BidForm({ auction, user }) {
   const showForm = availability.allowed || canRetry;
   const fieldDisabled = busy || Boolean(intent) || !availability.allowed;
   const minimum = auction?.nextMinimumBid;
-  const buttonDisabled = busy || submitStatus === 'loading' || (!availability.allowed && !canRetry) || String(activeId) !== String(auction?.id);
+  const buttonDisabled = (deadlinePending && !intent) || busy || submitStatus === 'loading' || (!availability.allowed && !canRetry) || String(activeId) !== String(auction?.id);
 
   return <section className="bid-zone" aria-labelledby="bid-form-title">
     <div className="bid-zone-head"><div><p className="eyebrow">Live bidding</p><h2 id="bid-form-title">Ajukan penawaran</h2></div><span className="bid-status-pill">{auction?.status === 'live' ? 'Lelang live' : auction?.status === 'ended' ? 'Berakhir' : 'Belum dimulai'}</span></div>
@@ -105,10 +105,11 @@ export default function BidForm({ auction, user }) {
     <p className="current-price">{formatRupiah(auction?.currentPrice ?? auction?.startingPrice)}</p>
     <p className="next-bid">Minimum bid berikutnya <strong>{formatRupiah(minimum)}</strong></p>
     <p className="next-bid">Kenaikan minimum <strong>{formatRupiah(auction?.minIncrement)}</strong></p>
-    {showForm ? <form className="bid-form" onSubmit={handleSubmit} noValidate>
+    {showForm ? <form className="bid-form" onSubmit={(e)=>handleSubmit(e)} noValidate>
       <label className="currency-input"><span aria-hidden="true">Rp</span><span className="sr-only">Nominal penawaran dalam rupiah</span><input className="bid-input" name="amount" type="text" inputMode="numeric" autoComplete="off" maxLength={10} pattern="[0-9]*" value={amountText} onChange={handleAmountChange} placeholder={minimum ? String(minimum) : 'Masukkan nominal'} aria-invalid={Boolean(validationError)} aria-describedby="bid-guidance bid-validation" disabled={fieldDisabled} /></label>
       <button className="btn btn-primary" type="submit" disabled={buttonDisabled}>{busy ? 'Mengirim…' : intent ? 'Coba ulang bid' : 'Kirim bid'}</button>
     </form> : <div className="bid-unavailable">{!user && !authRestoring ? <><Link to="/login">Masuk</Link> untuk mengajukan penawaran.</> : availability.reason}</div>}
+    {deadlinePending && <p className="bid-feedback bid-feedback-warning" role="status">Waktu habis. Bid baru dijeda sampai server mengonfirmasi status lelang.</p>}
     {showForm && <p id="bid-guidance" className="secure-note">{intent ? 'Percobaan sebelumnya belum terkonfirmasi. Ulangi request dengan nominal dan ID yang sama untuk memastikan hasilnya.' : `Nominal harus berupa rupiah bulat dan minimal ${formatRupiah(minimum)}. Server memvalidasi setiap penawaran.`}</p>}
     {validationError && <p id="bid-validation" className="bid-feedback form-error" role="alert">{validationError}</p>}
     {feedback && <p className={`bid-feedback bid-feedback-${feedback.type}`} role={feedback.type === 'success' ? 'status' : 'alert'}>{feedback.message}</p>}

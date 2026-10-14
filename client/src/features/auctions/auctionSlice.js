@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api, { getApiData, getApiError } from '../../lib/api.js';
 import { auctionFieldsConflict, isValidEvent, mergeBids, mergePublicInteractions, sameId, validateSnapshot } from './auctionRoom.js';
+import { estimateServerOffset } from './serverClock.js';
 
 const initialState = {
   catalog: {
@@ -138,8 +139,9 @@ export const loadAuctionSnapshot = createAsyncThunk(
   async (auctionId, { rejectWithValue, signal }) => {
     try {
       if (!/^[1-9]\d*$/.test(String(auctionId ?? ''))) return rejectWithValue('ID lelang tidak valid.');
+      const localSentAt = Date.now();
       const response = await api.get(`/auctions/${auctionId}`, { signal });
-      return validateSnapshot(getApiData(response), auctionId);
+      return { ...validateSnapshot(getApiData(response), auctionId), localSentAt, localReceivedAt: Date.now() };
     } catch (error) {
       return rejectWithValue(getApiError(error, 'Gagal memuat detail lelang.'));
     }
@@ -263,7 +265,8 @@ function applySnapshot(active, snapshot, toCard) {
   active.aiMeta = aiMeta ?? active.aiMeta;
   active.participants = Array.isArray(checked.participants) ? checked.participants : active.participants;
   active.serverNow = serverNow || active.serverNow;
-  active.serverTimeOffsetMs = serverNow && Number.isFinite(Date.parse(serverNow)) ? Date.parse(serverNow) - Date.now() : active.serverTimeOffsetMs;
+  const estimatedOffset = estimateServerOffset(serverNow, snapshot.localSentAt ?? Date.now(), snapshot.localReceivedAt ?? Date.now());
+  active.serverTimeOffsetMs = estimatedOffset ?? active.serverTimeOffsetMs;
   active.loading = false;
   active.error = null;
   active.resyncRequired = false;
@@ -305,7 +308,8 @@ function applyIncremental(active, payload, toCard) {
   active.auction = toCard(incoming);
   active.version = version;
   active.serverNow = payload.serverNow || active.serverNow;
-  active.serverTimeOffsetMs = payload.serverNow && Number.isFinite(Date.parse(payload.serverNow)) ? Date.parse(payload.serverNow) - Date.now() : active.serverTimeOffsetMs;
+  const estimatedOffset = estimateServerOffset(payload.serverNow, Date.now(), Date.now());
+  active.serverTimeOffsetMs = estimatedOffset ?? active.serverTimeOffsetMs;
   mergeEventCollections(active, payload);
   active.resyncRequired = false;
   active.resyncReason = null;

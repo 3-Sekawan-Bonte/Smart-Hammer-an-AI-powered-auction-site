@@ -8,6 +8,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] FE-02 Authentication: register/login, pemulihan sesi, proteksi route, logout pada mobile, error terstruktur, dan tes terverifikasi pada mock. Baca `FE02_CHANGELOG.md` dan `FE02_IMPLEMENTATION_REPORT.md`; BE-03 produksi tetap belum selesai.
 - [x] FE-03 Auction UI: listing/pagination, create draft, owner-only edit draft, detail, start dengan konfirmasi, mock API lifecycle, dan validasi FE-03 terverifikasi. Lihat `FE03_IMPLEMENTATION_REPORT.md`.
 - [x] FE-04 Auction Room State Management: snapshot Redux tervalidasi, merge bid/AI deduplicated, version guard, resync state, room isolation, selectors/hooks, dan reducer tests terverifikasi. Lihat `FE04_CHANGELOG.md`.
+- [x] FE-06 Live Bidding UI + functional development mock: BidForm, BidHistory, REST submission, UUID idempotency, server-side validation, serialized local mock writes, sliding deadline, and real Socket.IO broadcasts verified. Lihat `FE06_CHANGELOG.md`; BE-05 production transaction/locking remains incomplete.
 - [ ] Cocokkan `PROJECT.md`, `PRD.md`, dan `ARCHITECTURE.md` dengan rubrik/requirement akhir.
 - [ ] Periksa struktur repository sebelum mengubah file.
 - [ ] Siapkan frontend React + Vite + Tailwind CSS.
@@ -64,6 +65,8 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 **Checkpoint:** seller dapat membuat draft, melihatnya, mengeditnya, dan memulai lelang.
 
 ## Phase 4 — Bidding aman dan idempotency
+
+**Development mock FE-06:** endpoint `POST/GET /auctions/:id/bids`, serialized single-process mutations, user-scoped idempotency, validation, event broadcast, and sliding deadline are implemented and tested. The production database-backed service below remains incomplete.
 
 - [ ] Implementasikan satu `bidService` sebagai sumber aturan bid.
 - [ ] Gunakan transaksi dan row lock pada Auction.

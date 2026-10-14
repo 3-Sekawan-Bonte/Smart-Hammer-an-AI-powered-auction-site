@@ -1,27 +1,82 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createServerClock } from '../features/auctions/serverClock.js';
+import { formatCountdown, getRemainingSeconds } from '../features/auctions/countdownUtils.js';
 
-export default function Countdown({ endsAt, serverNow }) {
-  const calculate = () => {
-    const deadline = Date.parse(endsAt);
-    if (!Number.isFinite(deadline)) return 0;
-    const observedServerTime = Date.parse(serverNow);
-    const serverOffset = Number.isFinite(observedServerTime) ? observedServerTime - Date.now() : 0;
-    return Math.max(0, Math.ceil((deadline - (Date.now() + serverOffset)) / 1000));
-  };
-  const [seconds, setSeconds] = useState(calculate);
+const MAX_EXPIRY_CHECKS = 3;
+const EXPIRY_RETRY_MS = 1500;
+
+export default function Countdown({
+  endsAt,
+  status = 'live',
+  serverNow,
+  serverTimeOffsetMs = 0,
+  onExpired,
+  onConfirmingChange,
+}) {
+  const deadline = typeof endsAt === 'number' ? endsAt : Date.parse(endsAt);
+  const timestampValid = Number.isFinite(deadline);
+  const callbackRef = useRef(onExpired);
+  const confirmingCallbackRef = useRef(onConfirmingChange);
+  const latestRef = useRef({ endsAt, status });
+  const [seconds, setSeconds] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  callbackRef.current = onExpired;
+  confirmingCallbackRef.current = onConfirmingChange;
+  latestRef.current = { endsAt, status };
+
+  const updateConfirming = useCallback((value) => {
+    setConfirming(value);
+    confirmingCallbackRef.current?.(value);
+  }, []);
 
   useEffect(() => {
-    setSeconds(calculate());
-    const timer = window.setInterval(() => setSeconds(calculate()), 1000);
-    return () => window.clearInterval(timer);
-  }, [endsAt, serverNow]);
+    if (status !== 'live' || !timestampValid) {
+      setSeconds(null);
+      updateConfirming(false);
+      return undefined;
+    }
 
-  const hours = Math.floor(seconds / 3600);
-  const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-  const remainder = String(seconds % 60).padStart(2, '0');
+    updateConfirming(false);
+    const monotonic = () => globalThis.performance?.now?.() ?? Date.now();
+    const monotonicAnchor = monotonic();
+    const serverClock = createServerClock({ serverNow, serverTimeOffsetMs, monotonicNow: monotonicAnchor });
+    let disposed = false;
+    let expiryCheckStarted = false;
+    let retryTimer;
 
-  if (hours > 0) {
-    return <span>{hours}j {minutes}m</span>;
-  }
-  return <span>{minutes}:{remainder}</span>;
+    const calculate = () => getRemainingSeconds(deadline, serverClock.now(monotonic()));
+    const tick = () => {
+      const next = calculate();
+      setSeconds(next);
+      if (next !== 0 || expiryCheckStarted) return;
+      expiryCheckStarted = true;
+      updateConfirming(true);
+      void (async () => {
+        for (let attempt = 0; attempt < MAX_EXPIRY_CHECKS; attempt += 1) {
+          if (disposed || latestRef.current.status !== 'live' || latestRef.current.endsAt !== endsAt) return;
+          try { await callbackRef.current?.(); } catch { /* Keep the neutral confirmation state. */ }
+          if (disposed || latestRef.current.status !== 'live' || latestRef.current.endsAt !== endsAt) return;
+          if (attempt + 1 < MAX_EXPIRY_CHECKS) {
+            await new Promise((resolve) => { retryTimer = window.setTimeout(resolve, EXPIRY_RETRY_MS); });
+          }
+        }
+      })();
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      if (retryTimer) window.clearTimeout(retryTimer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [deadline, endsAt, serverNow, serverTimeOffsetMs, status, timestampValid, updateConfirming]);
+
+  if (status !== 'live') return null;
+  if (!timestampValid) return <span className="countdown-invalid" role="status">Waktu lelang belum tersedia</span>;
+  if (seconds === 0 || confirming) return <span className="countdown-confirming" role="status">Waktu habis · Mengonfirmasi hasil lelang…</span>;
+  return <span className="auction-countdown" role="timer" aria-label={seconds == null ? 'Menghitung waktu tersisa' : `${seconds} detik tersisa`}>{formatCountdown(seconds ?? 0)}</span>;
 }
