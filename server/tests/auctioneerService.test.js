@@ -22,6 +22,7 @@ function makeAuction(overrides = {}) {
 
 function setup({ provider = { generateCommentary: jest.fn(async () => ({ answer: 'Kamera ini mulai ditawarkan.', missingInformation: [] })) }, failDuplicate = false, maxConcurrent } = {}) {
   const records = [];
+  const logger = { error: jest.fn(), warn: jest.fn() };
   const eventPublisher = { publishAIInteraction: jest.fn() };
   const AIInteraction = {
     async create(values) {
@@ -45,10 +46,10 @@ function setup({ provider = { generateCommentary: jest.fn(async () => ({ answer:
     provider,
     eventPublisher,
     clock: () => new Date('2026-10-14T10:00:00.000Z'),
-    logger: { error: jest.fn(), warn: jest.fn() },
+    logger,
     ...(maxConcurrent ? { maxConcurrent } : {}),
   });
-  return { service, provider, eventPublisher, records };
+  return { service, provider, eventPublisher, records, logger };
 }
 
 describe('AI Auctioneer service', () => {
@@ -107,13 +108,15 @@ describe('AI Auctioneer service', () => {
   });
 
   test('records provider failures as failed and emits only a safe error event', async () => {
-    const state = setup({ provider: { generateCommentary: jest.fn(async () => { throw Object.assign(new Error('private provider body'), { code: 'AI_TIMEOUT' }); }) } });
+    const state = setup({ provider: { generateCommentary: jest.fn(async () => { throw Object.assign(new Error('private provider body'), { code: 'AI_RATE_LIMITED', statusCode: 429 }); }) } });
     state.service.trigger({ auction: makeAuction({ status: 'ended' }), trigger: 'end', triggerData: { bidCount: 2 } });
     await state.service.waitForIdle();
-    expect(state.records[0]).toMatchObject({ status: 'failed', errorCode: 'AI_TIMEOUT', answer: null });
+    expect(state.records[0]).toMatchObject({ status: 'failed', errorCode: 'AI_UNAVAILABLE', answer: null });
     expect(state.eventPublisher.publishAIInteraction.mock.calls.map(([event]) => event)).toEqual(['ai:pending', 'ai:error']);
     expect(state.eventPublisher.publishAIInteraction.mock.calls[1][1].message).toBe('Auctioneer commentary is temporarily unavailable.');
     expect(JSON.stringify(state.eventPublisher.publishAIInteraction.mock.calls)).not.toContain('private provider body');
+    expect(state.logger.error).toHaveBeenCalledWith('AI Auctioneer failed for auction 42 (AI_RATE_LIMITED status=429).');
+    expect(JSON.stringify(state.logger.error.mock.calls)).not.toContain('private provider body');
   });
 
   test('limits commentary to one active generation per auction without blocking other rooms', async () => {

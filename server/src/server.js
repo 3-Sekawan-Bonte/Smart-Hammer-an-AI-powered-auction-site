@@ -13,10 +13,14 @@ const port = Number(process.env.PORT || 3000);
 
 const eventPublisher = createAuctionEventPublisher();
 const auctioneer = createAuctioneerService({ AIInteraction, eventPublisher });
-const dependencies = { sequelize, User, Auction, Bid, AIInteraction, eventPublisher, auctioneer };
+const dependencies = { sequelize, User, Auction, Bid, AIInteraction, eventPublisher, auctioneer, env: process.env };
 
 const httpServer = http.createServer(app.createApp(dependencies));
-const io = createSocketServer(httpServer, dependencies);
+const allowedOrigins = String(process.env.CLIENT_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173,http://127.0.0.1:5173'))
+  .split(',').map((origin) => origin.trim()).filter(Boolean);
+const io = createSocketServer(httpServer, dependencies, {
+  cors: { origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)), methods: ['GET', 'POST'] },
+});
 eventPublisher.attach(io);
 
 const closureService = createAuctionClosureService({ ...dependencies });

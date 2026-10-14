@@ -6,6 +6,7 @@ const emptyValues = {
   title: '',
   description: '',
   condition: 'used_good',
+  category: 'smartphone',
   imageUrl: '',
   startingPrice: '',
   minIncrement: '',
@@ -22,6 +23,7 @@ function valuesFromAuction(auction) {
     title: auction?.title || '',
     description: auction?.description || '',
     condition: auction?.condition || 'used_good',
+    category: auction?.category || 'smartphone',
     imageUrl: auction?.imageUrl || '',
     startingPrice: String(auction?.startingPrice ?? ''),
     minIncrement: String(auction?.minIncrement ?? ''),
@@ -46,6 +48,7 @@ function validate(values) {
   if (title.length < 3 || title.length > 120) errors.title = 'Judul wajib 3–120 karakter.';
   if (description.length < 10 || description.length > 3000) errors.description = 'Deskripsi wajib 10–3000 karakter.';
   if (!['new', 'used_good', 'used_fair'].includes(values.condition)) errors.condition = 'Pilih kondisi produk yang tersedia.';
+  if (!['smartphone', 'laptop', 'pc', 'camera', 'tablet', 'monitor', 'audio', 'gaming_console', 'accessories'].includes(values.category)) errors.category = 'Pilih kategori yang tersedia.';
   if (imageUrl.length > 2048) errors.imageUrl = 'URL gambar maksimal 2048 karakter.';
   else {
     try {
@@ -74,6 +77,7 @@ function validate(values) {
       title,
       description,
       condition: values.condition,
+      category: values.category,
       imageUrl,
       startingPrice,
       minIncrement,
@@ -175,6 +179,15 @@ export default function AuctionForm({
           {errorText('condition')}
         </div>
         <div className="field">
+          <label htmlFor="auction-category">Kategori</label>
+          <select className="input" id="auction-category" {...fieldProps('category')}>
+            <option value="smartphone">Smartphone</option><option value="laptop">Laptop</option><option value="pc">PC</option>
+            <option value="camera">Kamera</option><option value="tablet">Tablet</option><option value="monitor">Monitor</option>
+            <option value="audio">Audio</option><option value="gaming_console">Konsol game</option><option value="accessories">Aksesori</option>
+          </select>
+          {errorText('category')}
+        </div>
+        <div className="field">
           <label htmlFor="auction-duration">Durasi lelang (detik)</label>
           <input className="input" id="auction-duration" type="number" inputMode="numeric" min="60" max="86400" step="1" {...fieldProps('durationSeconds')} required />
           <p className="helper">60 detik sampai 24 jam. Waktu mulai dan akhir ditetapkan server saat lelang dimulai.</p>
@@ -197,7 +210,7 @@ export default function AuctionForm({
         </div>
         <div className="field full facts-heading">
           <p className="eyebrow">Informasi produk</p>
-          <p className="helper">Kategori elektronik ditetapkan otomatis.</p>
+          <p className="helper">Pilih kategori yang paling sesuai dengan barang.</p>
         </div>
         <div className="field full">
           <label htmlFor="auction-specifications">Spesifikasi</label>
@@ -223,7 +236,7 @@ export default function AuctionForm({
         <div className="listing-preview full" aria-live="polite">
           <div><span className="small muted">Preview listing</span><strong>{values.title || 'Nama produk'}</strong></div>
           <div><span className="small muted">Harga awal</span><strong>{values.startingPrice ? money(Number(values.startingPrice)) : '—'}</strong></div>
-          <span className="preview-category">electronics</span>
+          <span className="preview-category">{values.category.replaceAll('_', ' ')}</span>
         </div>
       </div>
       <div className="form-actions hero-actions">

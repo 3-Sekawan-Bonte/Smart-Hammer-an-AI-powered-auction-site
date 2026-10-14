@@ -7,7 +7,7 @@ import {
 
 const ACK_TIMEOUT_MS = 5000;
 const JOIN_RETRIES = 2;
-const auctionEvents = ['auction:snapshot', 'auction:started', 'bid:updated', 'auction:ended', 'ai:pending', 'ai:message', 'ai:error', 'auction:presence'];
+const auctionEvents = ['auction:snapshot', 'auction:started', 'bid:updated', 'auction:ended', 'ai:pending', 'ai:message', 'ai:error'];
 let socket = null;
 let storeDispatch = null;
 let activeToken = null;
@@ -24,7 +24,7 @@ let handlers = null;
 export function setSocketDispatch(dispatch) { storeDispatch = dispatch; }
 
 export function initSocket(token, socketUrl = import.meta.env?.VITE_SOCKET_URL) {
-  socketUrl = socketUrl?.trim() || import.meta.env?.VITE_API_BASE_URL || 'http://127.0.0.1:3001';
+  socketUrl = socketUrl?.trim() || import.meta.env?.VITE_SOCKET_URL || import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3000';
   if (!socketUrl || !token) {
     disconnectSocket();
     storeDispatch?.(socketUnavailable());
@@ -81,8 +81,7 @@ function bindSocketHandlers(target) {
     const handler = (payload) => {
       if (socket !== target || !desiredRoom || String(payload?.auctionId ?? payload?.auction?.id ?? payload?.interaction?.auctionId ?? '') !== desiredRoom) return;
       if (eventName === 'auction:snapshot') { snapshotSeenForJoin = true; clearFallbackTimer(); }
-      if (eventName === 'auction:presence') storeDispatch?.({ type: 'auction/presenceReceived', payload: payload.participants ?? payload });
-      else storeDispatch?.(processAuctionEvent(eventName, payload));
+      storeDispatch?.(processAuctionEvent(eventName, payload));
     };
     handlers.events.set(eventName, handler);
     target.on(eventName, handler);

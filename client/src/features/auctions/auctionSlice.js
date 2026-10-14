@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import api, { getApiData, getApiError } from '../../lib/api.js';
-import { auctionFieldsConflict, isValidEvent, mergeBids, mergePublicInteractions, sameId, validateSnapshot } from './auctionRoom.js';
+import { auctionFieldsConflict, isValidEvent, mergeBids, mergePublicInteractions, normalizeSocketEvent, sameId, validateSnapshot } from './auctionRoom.js';
 import { estimateServerOffset } from './serverClock.js';
 
 const initialState = {
@@ -52,7 +52,7 @@ const fixtureImagePositions = {
 function toAuctionCard(item) {
   return {
     ...item,
-    category: item.category || 'electronics',
+    category: item.category || null,
     price: Number(item.currentPrice ?? item.startingPrice ?? 0),
     bids: Number(item.bidCount ?? 0),
     time: remainingTime(item.endsAt),
@@ -71,6 +71,15 @@ function requestError(error, fallback) {
   };
 }
 
+function normalizePageMeta(meta, page, limit, count) {
+  return {
+    currentPage: meta?.page ?? meta?.currentPage ?? page,
+    limit: meta?.limit ?? limit,
+    totalData: meta?.total ?? meta?.totalData ?? count,
+    totalPages: meta?.totalPages ?? Math.ceil(count / limit),
+  };
+}
+
 function remainingTime(endsAt) {
   if (!endsAt) return '00:00';
   const totalSeconds = Math.max(0, Math.floor((new Date(endsAt).getTime() - Date.now()) / 1000));
@@ -83,12 +92,13 @@ function remainingTime(endsAt) {
 
 export const loadAuctions = createAsyncThunk(
   'auction/loadAuctions',
-  async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
+  async ({ page = 1, limit = 10, status, category, search, seller } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get('/auctions', { params: { page, limit } });
+      const params = { page, limit, ...(status ? { status } : {}), ...(category ? { category } : {}), ...(search?.trim() ? { search: search.trim() } : {}), ...(seller ? { seller } : {}) };
+      const response = await api.get('/auctions', { params });
       const auctions = getApiData(response);
       if (!Array.isArray(auctions)) throw new Error('Format respons daftar lelang tidak valid.');
-      return { auctions: auctions.map(toAuctionCard), meta: response.data?.meta || { currentPage: page, limit, totalData: auctions.length, totalPages: 1 } };
+      return { auctions: auctions.map(toAuctionCard), meta: normalizePageMeta(response.data?.meta, page, limit, auctions.length) };
     } catch (error) {
       return rejectWithValue(getApiError(error, error.message || 'Daftar lelang gagal dimuat.'));
     }
@@ -117,6 +127,18 @@ export const updateAuction = createAsyncThunk(
       return toAuctionCard(result.auction ?? result);
     } catch (error) {
       return rejectWithValue(requestError(error, 'Draft gagal diperbarui. Periksa data dan coba lagi.'));
+    }
+  }
+);
+
+export const deleteAuction = createAsyncThunk(
+  'auction/deleteAuction',
+  async (auctionId, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/auctions/${auctionId}`);
+      return getApiData(response);
+    } catch (error) {
+      return rejectWithValue(requestError(error, 'Draft gagal dihapus. Muat ulang dan coba lagi.'));
     }
   }
 );
@@ -202,7 +224,7 @@ export const loadAIInteractions = createAsyncThunk(
       const result = getApiData(response);
       const interactions = Array.isArray(result) ? result : result?.aiInteractions;
       if (!Array.isArray(interactions)) throw new Error('Format riwayat AI tidak valid.');
-      return { interactions, meta: response.data?.meta || result?.meta || null, auctionId: String(auctionId), page };
+      return { interactions, meta: normalizePageMeta(response.data?.meta || result?.meta, page, limit, interactions.length), auctionId: String(auctionId), page };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat AI.');
     }
@@ -217,7 +239,7 @@ export const loadBids = createAsyncThunk(
       const result = getApiData(response);
       const bids = Array.isArray(result) ? result : result?.bids;
       if (!Array.isArray(bids)) throw new Error('Format riwayat bid tidak valid.');
-      return { bids, meta: response.data?.meta || result?.meta || null, auctionId: String(auctionId), page };
+      return { bids, meta: normalizePageMeta(response.data?.meta || result?.meta, page, limit, bids.length), auctionId: String(auctionId), page };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat bid.');
     }
@@ -236,7 +258,7 @@ export const processAuctionEvent = (eventName, payload) => (dispatch, getState) 
   };
   const actionCreator = actions[eventName];
   if (!actionCreator) return null;
-  dispatch(actionCreator(payload));
+  dispatch(actionCreator(normalizeSocketEvent(payload)));
   const { active } = getState().auction;
   if (active.resyncRequired && active.currentId && !active.requestId) return dispatch(loadAuctionSnapshot(active.currentId));
   return null;

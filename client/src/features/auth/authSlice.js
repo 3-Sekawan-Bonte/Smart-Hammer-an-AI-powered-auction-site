@@ -50,13 +50,15 @@ export const login = createAsyncThunk(
     try {
       const response = await api.post('/users/login', { email: email.trim().toLowerCase(), password });
       const result = getApiData(response);
-      if (typeof result?.access_token !== 'string' || !result.access_token || result.tokenType !== 'Bearer' ||
-          !Number.isFinite(result.expiresIn) || result.expiresIn <= 0 || !isUser(result.user)) {
+      // The backend contract currently names the JWT `accessToken`. Accept the
+      // snake_case spelling as well for compatibility with the development mock.
+      const token = result?.accessToken || result?.access_token;
+      if (typeof token !== 'string' || !token || !isUser(result.user)) {
         return rejectWithValue('Respons login tidak valid. Silakan coba lagi.');
       }
-      localStorage.setItem(TOKEN_KEY, result.access_token);
+      localStorage.setItem(TOKEN_KEY, token);
       localStorage.setItem(USER_ID_KEY, String(result.user.id));
-      return { token: result.access_token, user: result.user };
+      return { token, user: result.user };
     } catch (error) {
       return rejectWithValue(getApiErrorDetails(error, 'Login gagal. Periksa email dan password.'));
     }

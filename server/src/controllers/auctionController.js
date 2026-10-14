@@ -15,9 +15,10 @@ function createAuctionController(dependencies) {
     },
     get: async (req, res) => {
       const auction = await service.getById(validateAuctionId(req.params.id), req.user.id);
+      const bidCount = await dependencies.Bid.count({ where: { auctionId: auction.id } });
       return res.json({
         message: 'Auction retrieved successfully.',
-        data: { auction: auctionToJSON(auction), serverNow: new Date().toISOString() },
+        data: { auction: auctionToJSON(auction, { bidCount }), serverNow: new Date().toISOString() },
       });
     },
     update: async (req, res) => {

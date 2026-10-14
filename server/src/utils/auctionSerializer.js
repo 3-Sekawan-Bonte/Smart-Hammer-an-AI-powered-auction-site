@@ -3,8 +3,14 @@ function publicUser(user) {
   return { id: user.id, username: user.username };
 }
 
-function auctionToJSON(auction) {
+function auctionToJSON(auction, options = {}) {
   const value = typeof auction.toJSON === 'function' ? auction.toJSON() : auction;
+  const bidCount = Number.isSafeInteger(options.bidCount) ? options.bidCount
+    : Number.isSafeInteger(value.bidCount) ? value.bidCount : null;
+  const nextMinimumBid = value.status !== 'live' ? null
+    : (value.highestBidderId === null ? value.startingPrice : value.currentPrice + value.minIncrement) <= 2_000_000_000
+      ? (value.highestBidderId === null ? value.startingPrice : value.currentPrice + value.minIncrement)
+      : null;
   return {
     id: value.id,
     sellerId: value.sellerId,
@@ -16,6 +22,8 @@ function auctionToJSON(auction) {
     imageUrl: value.imageUrl,
     startingPrice: value.startingPrice,
     currentPrice: value.currentPrice,
+    bidCount,
+    nextMinimumBid,
     minIncrement: value.minIncrement,
     durationSeconds: value.durationSeconds,
     startsAt: value.startsAt ? new Date(value.startsAt).toISOString() : null,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { loadAuctionSnapshot, selectActiveAuction, selectActiveLoading, selectActiveError, selectActiveId, selectServerNow, selectServerTimeOffsetMs, selectStartStatus, startAuction } from '../features/auctions/auctionSlice';
+import { deleteAuction, loadAuctionSnapshot, selectActiveAuction, selectActiveLoading, selectActiveError, selectActiveId, selectServerNow, selectServerTimeOffsetMs, selectStartStatus, startAuction } from '../features/auctions/auctionSlice';
 import { selectUser } from '../features/auth/authSlice';
 import { selectConnectionStatus, selectRoomError, selectRoomStatus } from '../features/socket/socketSlice';
 import { money } from '../components/AuctionCard';
@@ -16,6 +16,8 @@ export default function AuctionDetailPage() {
   const auction = useSelector(selectActiveAuction); const loading = useSelector(selectActiveLoading); const error = useSelector(selectActiveError); const activeId = useSelector(selectActiveId); const serverNow = useSelector(selectServerNow); const serverTimeOffsetMs = useSelector(selectServerTimeOffsetMs); const startStatus = useSelector(selectStartStatus); const user = useSelector(selectUser);
   const [confirming, setConfirming] = useState(false); const [message, setMessage] = useState(location.state?.notice || '');
   const [deadlinePending, setDeadlinePending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const cancelDialogRef = useRef(null);
   const resultRefreshRef = useRef(null);
   const connectionStatus = useSelector(selectConnectionStatus);
@@ -62,6 +64,12 @@ export default function AuctionDetailPage() {
     try { const updated = await dispatch(startAuction(id)).unwrap(); setConfirming(false); setMessage('Lelang berhasil dimulai.'); dispatch(loadAuctionSnapshot(String(updated.id))); }
     catch (failure) { const problem = typeof failure === 'string' ? { message: failure } : failure || {}; if (problem.code === 'AUCTION_NOT_DRAFT') { setConfirming(false); setMessage(`${problem.message || 'Lelang sudah bukan draft.'} Data terbaru dimuat.`); dispatch(loadAuctionSnapshot(id)); } else setMessage(problem.message || 'Lelang gagal dimulai. Coba lagi.'); }
   }
+  async function handleDelete() {
+    if (!window.confirm('Hapus draft lelang ini? Tindakan ini tidak dapat dibatalkan.')) return;
+    setDeleting(true); setDeleteError('');
+    try { await dispatch(deleteAuction(id)).unwrap(); navigate('/my-auctions', { replace: true, state: { notice: 'Draft dihapus.' } }); }
+    catch (failure) { setDeleteError(failure?.message || 'Draft gagal dihapus. Coba muat ulang.'); setDeleting(false); }
+  }
   const facts = auction.productFacts || {};
   return <div className="page"><div className="container fe03-detail">
     <div className="detail-topline"><Link to={isOwner ? '/my-auctions' : '/'} className="back-link">← {isOwner ? 'Lelang saya' : 'Marketplace'}</Link><div className="detail-status-group"><span className={`connection ${connectionStatus}`} role="status" aria-live="polite"><i />{connectionLabel(connectionStatus, roomStatus)}</span><span className={`badge static-badge ${status === 'live' ? 'badge-live' : status === 'ended' ? 'badge-ended' : 'badge-draft'}`}>{status === 'live' ? 'Live' : status === 'ended' ? 'Berakhir' : 'Draft'}</span></div></div>
@@ -73,7 +81,8 @@ export default function AuctionDetailPage() {
         <div className="fe03-facts"><Fact label="Spesifikasi" value={facts.specifications} /><Fact label="Kekurangan" value={facts.defects} /><Fact label="Aksesori" value={Array.isArray(facts.accessories) ? facts.accessories.join(', ') : ''} /><Fact label="Garansi" value={facts.warranty} /></div>
       </div>
     </section><aside className="detail-side-card"><p className="eyebrow">Ringkasan lelang</p><div className="detail-price-block"><span>Harga {auction.bidCount ? 'saat ini' : 'awal'}</span><strong>{money(auction.currentPrice ?? auction.startingPrice)}</strong></div><dl className="detail-data"><div><dt>Harga awal</dt><dd>{money(auction.startingPrice)}</dd></div><div><dt>Minimum kenaikan</dt><dd>{money(auction.minIncrement)}</dd></div><div><dt>Status</dt><dd>{status === 'live' ? 'Sedang berlangsung' : status === 'ended' ? 'Berakhir' : 'Draft'}</dd></div><div><dt>Mulai</dt><dd>{formatWib(auction.startsAt) || 'Belum dimulai'}</dd></div><div><dt>Berakhir</dt><dd>{formatWib(auction.endsAt) || 'Ditentukan saat dimulai'}</dd></div><div><dt>Durasi</dt><dd>{formatDuration(auction.durationSeconds)}</dd></div></dl>
-      {isOwner && isDraft && <div className="seller-actions"><Link className="btn btn-ghost" to={`/auctions/${auction.id}/edit`}>Edit draft</Link><button className="btn btn-primary" type="button" onClick={() => { setMessage(''); setConfirming(true); }}>Mulai lelang</button></div>}
+      {isOwner && isDraft && <div className="seller-actions"><Link className="btn btn-ghost" to={`/auctions/${auction.id}/edit`}>Edit draft</Link><button className="btn btn-ghost" type="button" onClick={handleDelete} disabled={deleting}>{deleting ? 'Menghapus…' : 'Hapus draft'}</button><button className="btn btn-primary" type="button" onClick={() => { setMessage(''); setConfirming(true); }}>Mulai lelang</button></div>}
+      {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
       {status === 'live' && <div className="countdown-card"><span className="eyebrow">Waktu tersisa</span><strong><Countdown endsAt={auction.endsAt} status={auction.status} serverNow={serverNow} serverTimeOffsetMs={serverTimeOffsetMs} onExpired={refreshAfterDeadline} onConfirmingChange={setDeadlinePending} /></strong><span className="countdown-caption">Deadline mengikuti waktu server dan dapat berubah saat bid diterima.</span></div>}
       {isDraft && <p className="detail-note">Countdown dimulai setelah lelang dibuka oleh penjual.</p>}{status === 'ended' && <p className="detail-note">Hasil lelang mengikuti snapshot yang dikonfirmasi server.</p>}
     </aside></div>

@@ -24,6 +24,7 @@ function createAuctionRoutes(dependencies) {
     .delete(asyncRoute(controller.remove));
   router.post('/:id/start', asyncRoute(controller.start));
   router.post('/:id/bids', asyncRoute(bidController.create));
+  router.get('/:id/bids', asyncRoute(bidController.list));
   router.post('/:id/ai/questions', asyncRoute(aiController.ask));
   router.get('/:id/ai/interactions', asyncRoute(aiController.list));
   return router;

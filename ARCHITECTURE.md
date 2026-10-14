@@ -13,7 +13,7 @@
 ## 2. Stack
 
 - Frontend: JavaScript, React, Vite, Tailwind CSS v4, React Router, Redux Toolkit (`@reduxjs/toolkit`), React Redux (`react-redux`), Axios, Socket.IO Client.
-- Backend: Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT (expiry 7 hari), bcryptjs, OpenAI API (`gpt-4o-mini`) via raw HTTP call (tanpa SDK `openai`).
+- Backend: Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT (expiry 7 hari), bcryptjs, Groq Chat Completions API (`openai/gpt-oss-120b`) via raw HTTP call (tanpa SDK).
 - Testing backend: Jest dan Supertest.
 - Kategori lelang: seller memilih dari daftar tetap subkategori elektronik (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`); backend memvalidasi nilai.
 - Uang: integer rupiah. Batas MVP yang ditetapkan pada kontrak awal adalah Rp1–Rp2.000.000.000 untuk nominal dan hasil penjumlahannya.
@@ -441,16 +441,15 @@ Nama file boleh disesuaikan jika repository starter sudah punya konvensi berbeda
 - `JWT_SECRET`
 - `JWT_EXPIRES_IN` (default `7d`)
 - `CLIENT_ORIGIN`
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL` (default `gpt-4o-mini`)
-- `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
+- `GROQ_API_KEY` (server-side secret for Product Q&A and AI Auctioneer)
+- `GROQ_MODEL` (default `openai/gpt-oss-120b`)
 
 ### Frontend
 
 - `VITE_API_BASE_URL`
 - `VITE_SOCKET_URL`
 
-Buat `.env.example` tanpa nilai secret. `.env`, `node_modules`, token, dan credential tidak boleh masuk Git. Jangan menaruh `OPENAI_API_KEY` atau `JWT_SECRET` di variabel `VITE_*`.
+Buat `.env.example` tanpa nilai secret. `.env`, `node_modules`, token, dan credential tidak boleh masuk Git. Jangan menaruh `GROQ_API_KEY` atau `JWT_SECRET` di variabel `VITE_*`.
 
 ## 12. Deployment
 

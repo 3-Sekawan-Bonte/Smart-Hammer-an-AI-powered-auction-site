@@ -92,7 +92,7 @@ describe('Socket.IO auction synchronization', () => {
     expect(snapshots[0]).toMatchObject({
       auctionId: 12,
       version: 3,
-      data: { auction: { id: 12, version: 3, seller: { id: 7, username: 'seller' } }, bids: [], meta: { page: 1, limit: 10, total: 0 } },
+      data: { auction: { id: 12, version: 3, seller: { id: 7, username: 'seller' } }, bids: [], aiInteractions: [], bidsMeta: { page: 1, limit: 20, total: 0 }, aiMeta: { page: 1, limit: 20, total: 0 } },
     });
     expect(Number.isNaN(Date.parse(snapshots[0].serverNow))).toBe(false);
     expect(JSON.stringify(snapshots[0])).not.toContain('private@example.test');

@@ -14,14 +14,27 @@ export default function AuctionListPage() {
   const createStatus = useSelector(selectCreateStatus);
 
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
   const meta = useSelector(selectCatalogMeta);
 
   // Get featured auction for hero preview (first live auction)
   const featuredAuction = useMemo(() => auctions.find(a => a.status === 'live') || auctions[0], [auctions]);
 
   useEffect(() => {
-    dispatch(loadAuctions({ page }));
-  }, [dispatch, page]);
+    const timer = setTimeout(() => setSearch(searchInput.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, category, status]);
+
+  useEffect(() => {
+    dispatch(loadAuctions({ page, search, category, status }));
+  }, [dispatch, page, search, category, status]);
 
   useEffect(() => {
     if (createStatus === 'success') {
@@ -85,6 +98,18 @@ export default function AuctionListPage() {
             </div>
           )}
           <div className="results-meta"><span>{meta.totalData ?? results.length} lot ditemukan</span><span>Halaman {meta.currentPage || page} dari {Math.max(1, meta.totalPages || 1)} · harga IDR</span></div>
+          <div className="auction-filters" role="search" aria-label="Cari dan filter lelang">
+            <label className="sr-only" htmlFor="auction-search">Cari judul lelang</label>
+            <input id="auction-search" className="input" type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Cari nama produk" />
+            <label className="sr-only" htmlFor="auction-category-filter">Kategori</label>
+            <select id="auction-category-filter" className="input" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="">Semua kategori</option><option value="smartphone">Smartphone</option><option value="laptop">Laptop</option><option value="pc">PC</option><option value="camera">Kamera</option><option value="tablet">Tablet</option><option value="monitor">Monitor</option><option value="audio">Audio</option><option value="gaming_console">Konsol game</option><option value="accessories">Aksesori</option>
+            </select>
+            <label className="sr-only" htmlFor="auction-status-filter">Status</label>
+            <select id="auction-status-filter" className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
+              <option value="">Semua status aktif</option><option value="live">Live</option><option value="ended">Berakhir</option>
+            </select>
+          </div>
           {catalogLoading ? (
             <div className="auction-grid" aria-label="Memuat lelang">
               {[1, 2, 3].map((item) => (

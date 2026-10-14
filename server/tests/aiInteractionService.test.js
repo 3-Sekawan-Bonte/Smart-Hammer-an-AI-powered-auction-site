@@ -1,7 +1,7 @@
 const { createAIInteractionService, interactionToJSON } = require('../src/services/aiInteractionService');
 const { createAIQuestionRateLimiter } = require('../src/services/aiQuestionRateLimiter');
 
-function setup({ status = 'live', provider, eventPublisher, now = new Date('2026-10-14T12:00:00.000Z') } = {}) {
+function setup({ status = 'live', provider, eventPublisher, logger = { error: jest.fn() }, now = new Date('2026-10-14T12:00:00.000Z') } = {}) {
   const auction = {
     id: 9,
     sellerId: 3,
@@ -41,8 +41,8 @@ function setup({ status = 'live', provider, eventPublisher, now = new Date('2026
   };
   const clock = () => new Date(now);
   const rateLimiter = createAIQuestionRateLimiter({ clock: () => now.getTime() });
-  const service = createAIInteractionService({ Auction, AIInteraction, User, provider, eventPublisher, rateLimiter, clock });
-  return { service, auction, records, AIInteraction };
+  const service = createAIInteractionService({ Auction, AIInteraction, User, provider, eventPublisher, logger, rateLimiter, clock });
+  return { service, auction, records, AIInteraction, logger };
 }
 
 describe('AI interaction service', () => {
@@ -110,6 +110,19 @@ describe('AI interaction service', () => {
       message: 'The AI answer service is temporarily unavailable.',
     }));
     expect(JSON.stringify(eventPublisher.publishAIInteraction.mock.calls)).not.toContain('private details');
+  });
+
+  test('persists safe Groq failure categories and logs only category and HTTP status', async () => {
+    const provider = { answerQuestion: jest.fn(async () => {
+      throw Object.assign(new Error('secret key and raw provider body'), { code: 'AI_RATE_LIMITED', statusCode: 429 });
+    }) };
+    const logger = { error: jest.fn() };
+    const { service, records } = setup({ provider, logger });
+    await expect(service.ask(22, 9, 'Apakah ada garansi?'))
+      .rejects.toMatchObject({ status: 503, code: 'AI_UNAVAILABLE' });
+    expect(records[0]).toMatchObject({ status: 'failed', errorCode: 'AI_UNAVAILABLE', answer: null });
+    expect(logger.error).toHaveBeenCalledWith('AI Product Q&A provider failure (AI_RATE_LIMITED status=429).');
+    expect(JSON.stringify(logger.error.mock.calls)).not.toContain('secret key');
   });
 
   test('publisher failures do not invalidate persisted Q&A success or failure', async () => {

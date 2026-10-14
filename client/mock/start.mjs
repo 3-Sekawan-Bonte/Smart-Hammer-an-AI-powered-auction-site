@@ -5,7 +5,7 @@ import {
   scrypt as scryptCallback,
   timingSafeEqual,
 } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -33,7 +33,13 @@ async function readDatabase(databasePath) {
 }
 
 async function saveDatabase(databasePath, database) {
-  await writeFile(databasePath, `${JSON.stringify(database, null, 2)}\n`, 'utf8');
+  const temporaryPath = `${databasePath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(database, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+    await rename(temporaryPath, databasePath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
 }
 
 function send(response, status, body) {
