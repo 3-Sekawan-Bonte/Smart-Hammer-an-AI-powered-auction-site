@@ -21,6 +21,7 @@ function auctionToJSON(auction) {
     startsAt: value.startsAt ? new Date(value.startsAt).toISOString() : null,
     endsAt: value.endsAt ? new Date(value.endsAt).toISOString() : null,
     status: value.status,
+    finalPrice: value.status === 'ended' && value.highestBidderId !== null ? value.currentPrice : null,
     highestBidderId: value.highestBidderId,
     winnerId: value.winnerId,
     version: value.version,

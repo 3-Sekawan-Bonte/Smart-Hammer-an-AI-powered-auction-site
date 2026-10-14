@@ -31,6 +31,7 @@ class Auction extends Model {
       indexes: [
         { fields: ['sellerId', 'createdAt', 'id'] },
         { fields: ['status', 'category', 'createdAt', 'id'] },
+        { fields: ['status', 'endsAt', 'id'], name: 'auctions_status_ends_at_id_idx' },
       ],
     });
     return Auction;

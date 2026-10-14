@@ -74,11 +74,11 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 ## Phase 5 — Penutupan dan countdown
 
 - [ ] Implementasikan service penutupan yang memakai lock Auction yang sama dengan bid.
-- [ ] Tambahkan pemeriksaan deadline berkala.
-- [ ] Tambahkan startup recovery untuk auction live yang sudah expired.
-- [ ] Tentukan winner/finalPrice secara idempotent.
-- [ ] Tangani lelang berakhir tanpa bid.
-- [ ] Pastikan bid tepat pada/setelah deadline ditolak.
+- [x] Tambahkan pemeriksaan deadline berkala.
+- [x] Tambahkan startup recovery untuk auction live yang sudah expired.
+- [x] Tentukan winner/finalPrice secara idempotent.
+- [x] Tangani lelang berakhir tanpa bid.
+- [x] Pastikan bid tepat pada/setelah deadline ditolak.
 - [ ] Implementasikan countdown frontend dengan `endsAt` terbaru dan koreksi `serverNow`.
 - [ ] Uji penutupan berulang, sliding deadline, dan restart recovery.
 
