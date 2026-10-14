@@ -7,7 +7,6 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toStri
 const app = require('../src/app');
 const { sequelize, User, Auction, Bid } = require('../src/models');
 
-const suffix = `${process.pid}-${crypto.randomUUID()}`;
 const PASSWORD_HASH = '$2a$10$wHkV4zgYY5HM4ymwYh2hLe7v5fSnmbZk1jB3gM3bE9mZkSXtE3g3K';
 const auctionInput = {
   title: 'Bidding test camera',
@@ -62,16 +61,16 @@ function bidBody(overrides = {}) {
 }
 
 beforeAll(async () => {
-  if (!process.env.DATABASE_URL && (!process.env.DB_NAME || !process.env.DB_USERNAME)) {
-    throw new Error('Configure an isolated PostgreSQL test database using DATABASE_URL or DB_NAME and DB_USERNAME.');
+  if (!process.env.TEST_DATABASE_URL && (!process.env.TEST_DB_NAME || !process.env.TEST_DB_USERNAME)) {
+    throw new Error('Configure a dedicated test database with TEST_DATABASE_URL or TEST_DB_NAME and TEST_DB_USERNAME.');
   }
   await sequelize.authenticate();
 });
 
 beforeEach(async () => {
   auctionIds = [];
-  seller = await User.create({ username: 'bid-seller', email: `bid-seller-${suffix}-${crypto.randomUUID()}@example.test`, password: PASSWORD_HASH });
-  bidder = await User.create({ username: 'bid-buyer', email: `bid-buyer-${suffix}-${crypto.randomUUID()}@example.test`, password: PASSWORD_HASH });
+  seller = await User.create({ username: 'bid-seller', email: `bid-seller-${crypto.randomUUID()}@example.com`, password: PASSWORD_HASH });
+  bidder = await User.create({ username: 'bid-buyer', email: `bid-buyer-${crypto.randomUUID()}@example.com`, password: PASSWORD_HASH });
   sellerToken = tokenFor(seller);
   bidderToken = tokenFor(bidder);
 });

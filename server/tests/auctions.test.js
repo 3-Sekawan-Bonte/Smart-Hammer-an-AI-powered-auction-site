@@ -8,8 +8,8 @@ const app = require('../src/app');
 const { sequelize, User, Auction } = require('../src/models');
 
 const suffix = `${process.pid}-${crypto.randomUUID()}`;
-const firstEmail = `auction-a-${suffix}@example.test`;
-const secondEmail = `auction-b-${suffix}@example.test`;
+const firstEmail = `auction-a-${suffix}@example.com`;
+const secondEmail = `auction-b-${suffix}@example.com`;
 const PASSWORD_HASH = '$2a$10$wHkV4zgYY5HM4ymwYh2hLe7v5fSnmbZk1jB3gM3bE9mZkSXtE3g3K';
 const input = {
   title: 'Sony Alpha camera',
@@ -56,8 +56,8 @@ async function createRawAuction(overrides = {}) {
 }
 
 beforeAll(async () => {
-  if (!process.env.DATABASE_URL && (!process.env.DB_NAME || !process.env.DB_USERNAME)) {
-    throw new Error('Configure an isolated PostgreSQL test database using DATABASE_URL or DB_NAME and DB_USERNAME.');
+  if (!process.env.TEST_DATABASE_URL && (!process.env.TEST_DB_NAME || !process.env.TEST_DB_USERNAME)) {
+    throw new Error('Configure a dedicated test database with TEST_DATABASE_URL or TEST_DB_NAME and TEST_DB_USERNAME.');
   }
   await sequelize.authenticate();
 });
@@ -143,7 +143,7 @@ describe('auction listing and details', () => {
     const defaults = await request(app).get('/auctions').set(auth());
     expect(defaults.status).toBe(200);
     expect(defaults.body.meta).toEqual({ page: 1, limit: 10, total: 2, totalPages: 1 });
-    expect(defaults.body.data.map((item) => item.title).sort()).toEqual(['Other seller camera', 'Other public camera']);
+    expect(defaults.body.data.map((item) => item.title).sort()).toEqual(['Other public camera', 'Other seller camera']);
     const mine = await request(app).get('/auctions?seller=me&status=draft&category=camera&search=sony').set(auth());
     expect(mine.body.data.map((item) => item.id)).toEqual([own.id]);
     const filtered = await request(app).get('/auctions?status=live&category=camera&search=other&limit=1&page=1').set(auth());

@@ -8,7 +8,6 @@ const app = require('../src/app');
 const { sequelize, User, Auction, Bid } = require('../src/models');
 const { createAuctionClosureService } = require('../src/services/auctionClosureService');
 
-const suffix = `${process.pid}-${crypto.randomUUID()}`;
 const auctionInput = {
   title: 'Closure test camera',
   description: 'A camera in good working condition for closure tests.',
@@ -54,8 +53,8 @@ async function createAuction(overrides = {}) {
 }
 
 beforeAll(async () => {
-  if (!process.env.DATABASE_URL && (!process.env.DB_NAME || !process.env.DB_USERNAME)) {
-    throw new Error('Configure an isolated PostgreSQL test database using DATABASE_URL or DB_NAME and DB_USERNAME.');
+  if (!process.env.TEST_DATABASE_URL && (!process.env.TEST_DB_NAME || !process.env.TEST_DB_USERNAME)) {
+    throw new Error('Configure a dedicated test database with TEST_DATABASE_URL or TEST_DB_NAME and TEST_DB_USERNAME.');
   }
   await sequelize.authenticate();
   closureService = createAuctionClosureService({ Auction, Bid, sequelize });
@@ -63,8 +62,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   auctionIds = [];
-  seller = await User.create({ username: 'closure-seller', email: `closure-seller-${suffix}-${crypto.randomUUID()}@example.test`, password: '$2a$10$wHkV4zgYY5HM4ymwYh2hLe7v5fSnmbZk1jB3gM3bE9mZkSXtE3g3K' });
-  bidder = await User.create({ username: 'closure-bidder', email: `closure-bidder-${suffix}-${crypto.randomUUID()}@example.test`, password: '$2a$10$wHkV4zgYY5HM4ymwYh2hLe7v5fSnmbZk1jB3gM3bE9mZkSXtE3g3K' });
+  seller = await User.create({ username: 'closure-seller', email: `closure-seller-${crypto.randomUUID()}@example.com`, password: '$2a$10$wHkV4zgYY5HM4ymwYh2hLe7v5fSnmbZk1jB3gM3bE9mZkSXtE3g3K' });
+  bidder = await User.create({ username: 'closure-bidder', email: `closure-bidder-${crypto.randomUUID()}@example.com`, password: '$2a$10$wHkV4zgYY5HM4ymwYh2hLe7v5fSnmbZk1jB3gM3bE9mZkSXtE3g3K' });
   sellerToken = tokenFor(seller);
   bidderToken = tokenFor(bidder);
 });

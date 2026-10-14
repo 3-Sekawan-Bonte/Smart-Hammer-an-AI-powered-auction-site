@@ -1,11 +1,14 @@
 const request = require('supertest');
+const crypto = require('node:crypto');
 const app = require('../src/app');
 const { sequelize, User } = require('../src/models');
 
-const email = `auth-${process.pid}@example.test`;
+const email = `auth-${process.pid}-${crypto.randomUUID()}@example.com`;
 
 beforeAll(async () => {
-  if (!process.env.DATABASE_URL && !process.env.DB_NAME) throw new Error('Set DATABASE_URL (or DB_NAME/DB_USERNAME) to an isolated PostgreSQL test database.');
+  if (!process.env.TEST_DATABASE_URL && (!process.env.TEST_DB_NAME || !process.env.TEST_DB_USERNAME)) {
+    throw new Error('Configure a dedicated test database with TEST_DATABASE_URL or TEST_DB_NAME and TEST_DB_USERNAME.');
+  }
   await sequelize.authenticate();
 });
 

@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "jest --runInBand",
+    "test": "npm run db:migrate:test && jest --runInBand",
+    "db:create:test": "sequelize-cli db:create --env test",
+    "db:migrate:test": "sequelize-cli db:migrate --env test",
+    "db:migrate:status:test": "sequelize-cli db:migrate:status --env test",
     "seed:demo": "sequelize-cli db:seed:all --env development"
   },
   "dependencies": {
