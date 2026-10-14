@@ -1,4 +1,6 @@
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 const http = require('node:http');
 const app = require('./app');
 const { sequelize, User, Auction, Bid, AIInteraction } = require('./models');
