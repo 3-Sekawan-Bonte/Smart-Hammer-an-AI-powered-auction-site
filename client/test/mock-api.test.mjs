@@ -245,7 +245,7 @@ test('draft creation applies contract defaults, validates fields, and protects o
   assert.equal(invalidImage.status, 400);
 });
 
-test('bids are accepted through the mock REST API while AI questions remain explicitly unavailable', async (t) => {
+test('bids and asynchronous AI questions are accepted through the mock REST API', async (t) => {
   const { request, login } = await createHarness(t);
   const token = await login();
   const accepted = await request('/auctions/12/bids', { method: 'POST', headers: auth(token), body: JSON.stringify({ amount: 2100000, clientRequestId: randomUUID() }) });
@@ -255,13 +255,16 @@ test('bids are accepted through the mock REST API while AI questions remain expl
   assert.equal(acceptedBody.auction.bidCount, 1);
   assert.equal(acceptedBody.replayed, false);
   const ai = await request('/auctions/12/ai/questions', { method: 'POST', headers: auth(token), body: JSON.stringify({ question: 'Apakah ada garansi?' }) });
-  assert.equal(ai.status, 501);
-  assert.equal((await ai.json()).error.code, 'NOT_IMPLEMENTED');
+  assert.equal(ai.status, 202);
+  const aiBody = (await ai.json()).data.interaction;
+  assert.equal(aiBody.status, 'pending');
+  assert.equal(aiBody.question, 'Apakah ada garansi?');
   const snapshot = await request('/auctions/12', { headers: auth(token) });
   const body = await snapshot.json();
   assert.equal(body.data.auction.bidCount, 1);
   assert.equal(body.data.bids[0].amount, 2100000);
-  assert.deepEqual(body.data.aiInteractions, []);
+  assert.equal(body.data.aiInteractions.length, 1);
+  assert.equal(body.data.aiInteractions[0].id, aiBody.id);
 });
 
 test('draft PATCH enforces owner and draft state, replaces product facts, and start is one-time', async (t) => {

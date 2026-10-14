@@ -477,3 +477,48 @@ textarea.input { min-height: 128px; resize: vertical; }
 .winner-price span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 12px; }
 .winner-price strong { color: var(--ink); font-size: clamp(18px, 3vw, 25px); letter-spacing: -.035em; overflow-wrap: anywhere; }
 @media (max-width: 560px) { .winner-banner { align-items: flex-start; flex-wrap: wrap; gap: 12px; padding: 18px; } .winner-copy { flex: 1 1 calc(100% - 60px); } .winner-price { flex-basis: 100%; margin-left: 58px; padding: 12px 0 0; border-left: 0; border-top: 1px solid rgba(31, 88, 62, .16); } }
+
+/* FE-08 public Q&A and AI Auctioneer */
+.auction-room-panels { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, .9fr) minmax(320px, 1.2fr); gap: 18px; margin-top: 20px; align-items: start; }
+.ai-panel { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: 0 18px 50px rgba(19, 28, 54, .06); }
+.ai-panel-header { display: flex; gap: 13px; align-items: flex-start; }
+.ai-avatar { display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center; border-radius: 14px; background: linear-gradient(145deg, #edf0ff, #dff5f0); color: #5558c9; font-size: 23px; }
+.ai-panel-header .eyebrow { margin: 0 0 3px; }
+.ai-panel-header h2 { margin: 0; color: var(--ink); font-size: 20px; letter-spacing: -.03em; }
+.ai-panel-intro { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.ai-disclosure { margin: 16px 0; padding: 10px 12px; border-radius: 10px; background: #f7f8fc; color: #5f6880; font-size: 11px; line-height: 1.55; }
+.ai-history { display: grid; max-height: 470px; gap: 12px; overflow-y: auto; overscroll-behavior: contain; padding: 1px 3px 2px 0; }
+.ai-empty { display: grid; justify-items: center; padding: 24px 14px; border: 1px dashed #d9deea; border-radius: 14px; text-align: center; }
+.ai-empty > span { color: #686bd1; font-size: 24px; }
+.ai-empty strong { margin-top: 7px; color: var(--ink); font-size: 13px; }
+.ai-empty p { max-width: 240px; margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.ai-interaction { min-width: 0; padding: 12px; border: 1px solid #e8ebf2; border-radius: 13px; background: #fbfcff; }
+.ai-question { padding-bottom: 10px; }
+.ai-question > span { color: var(--ink); font-size: 11px; font-weight: 750; }
+.ai-question time { float: right; color: var(--muted); font-size: 10px; }
+.ai-question p { margin: 6px 0 0; color: #3b465e; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-answer { padding: 11px; border-radius: 10px; background: #f1f3ff; color: #30385e; }
+.ai-answer-label, .ai-commentary-label { color: #5154b8; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.ai-answer p { margin: 6px 0 0; font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ai-commentary-label { margin: 0 0 9px; }
+.ai-missing { margin-top: 9px; padding-top: 8px; border-top: 1px solid #dfe2f7; color: #7a5a17; font-size: 10px; }
+.ai-missing ul { margin: 4px 0 0; padding-left: 17px; line-height: 1.55; }
+.ai-pending { display: flex; gap: 8px; align-items: center; color: #5f6880; font-size: 11px; }
+.ai-spinner { width: 14px; height: 14px; border: 2px solid #d6d9e6; border-top-color: #585bc7; border-radius: 50%; animation: ai-spin .8s linear infinite; }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+.ai-failed { padding: 10px; border-radius: 9px; background: #fff5f2; color: #a03f31; font-size: 11px; line-height: 1.5; }
+.ai-source { margin-top: 9px; color: #778098; font-size: 9px; line-height: 1.5; }
+.ai-history-error, .ai-auth-hint { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.ai-load-more { width: 100%; min-height: 36px; font-size: 11px; }
+.ai-question-form { margin-top: 15px; }
+.ai-question-form textarea { display: block; width: 100%; min-height: 88px; resize: vertical; border: 1px solid #dce1ec; border-radius: 11px; outline: 0; padding: 11px 12px; color: var(--ink); font: inherit; font-size: 12px; line-height: 1.55; }
+.ai-question-form textarea:focus { border-color: #7174d9; box-shadow: 0 0 0 3px rgba(89, 92, 198, .12); }
+.ai-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; }
+.ai-form-footer > span { color: var(--muted); font-size: 10px; }
+.ai-form-footer .btn { min-height: 39px; padding-inline: 15px; font-size: 11px; }
+.ai-form-footer .btn:disabled { cursor: not-allowed; opacity: .58; }
+.ai-form-notice { min-height: 15px; margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 1100px) { .auction-room-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } .auction-room-panels > :last-child { grid-column: 1 / -1; } .ai-history { max-height: 390px; } }
+@media (max-width: 700px) { .auction-room-panels { grid-template-columns: 1fr; } .auction-room-panels > :last-child { grid-column: auto; } .ai-panel { padding: 18px; } .ai-history { max-height: 420px; } }
+@media (prefers-reduced-motion: reduce) { .ai-spinner { animation-duration: 2s; } }

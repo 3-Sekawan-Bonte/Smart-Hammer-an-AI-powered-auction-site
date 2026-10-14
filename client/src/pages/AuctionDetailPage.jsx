@@ -9,6 +9,7 @@ import BidForm from '../components/BidForm';
 import BidHistory from '../components/BidHistory';
 import Countdown from '../components/Countdown';
 import WinnerBanner, { getAuctionResultState } from '../components/WinnerBanner';
+import AIPanel from '../components/AIPanel';
 
 export default function AuctionDetailPage() {
   const { id } = useParams(); const dispatch = useDispatch(); const location = useLocation();
@@ -70,7 +71,7 @@ export default function AuctionDetailPage() {
       {isDraft && <p className="detail-note">Countdown dimulai setelah lelang dibuka oleh penjual.</p>}{status === 'ended' && <p className="detail-note">Hasil lelang mengikuti snapshot yang dikonfirmasi server.</p>}
     </aside></div>
     {status === 'ended' && <WinnerBanner auction={auction} user={user} />}
-    <div className="bid-panels-grid"><BidForm auction={auction} user={user} deadlinePending={deadlinePending} /><BidHistory auctionId={auction.id} highestBidder={auction.highestBidder} /></div>
+    <div className="auction-room-panels"><BidForm auction={auction} user={user} deadlinePending={deadlinePending} /><BidHistory auctionId={auction.id} highestBidder={auction.highestBidder} /><AIPanel auctionId={auction.id} status={auction.status} auctionVersion={auction.version} /></div>
     {confirming && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && startStatus !== 'loading') setConfirming(false); }}><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="start-title"><p className="eyebrow">Konfirmasi</p><h2 id="start-title" className="display">Mulai lelang sekarang?</h2><p>Waktu mulai dan berakhir akan ditetapkan server. Setelah dimulai, detail draft tidak dapat diedit.</p>{message && <p className="form-error" role="alert">{message}</p>}<div className="dialog-actions"><button ref={cancelDialogRef} className="btn btn-ghost" type="button" onClick={() => setConfirming(false)} disabled={startStatus === 'loading'}>Kembali</button><button className="btn btn-primary" type="button" onClick={handleStart} disabled={startStatus === 'loading'}>{startStatus === 'loading' ? 'Memulai…' : 'Ya, mulai lelang'}</button></div></section></div>}
   </div></div>;
 }

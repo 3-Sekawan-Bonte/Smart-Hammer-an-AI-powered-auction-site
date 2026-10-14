@@ -182,22 +182,27 @@ export const askAI = createAsyncThunk(
   async ({ auctionId, question }, { rejectWithValue }) => {
     try {
       const response = await api.post(`/auctions/${auctionId}/ai/questions`, { question });
-      return getApiData(response);
+      return { ...getApiData(response), auctionId: String(auctionId) };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.error?.message || 'Gagal mengirim pertanyaan ke AI.');
+      return rejectWithValue({
+        status: error.response?.status || null,
+        code: error.response?.data?.error?.code || null,
+        message: error.response?.data?.message || 'Gagal mengirim pertanyaan ke AI.',
+        retryAfterSeconds: Number(error.response?.data?.error?.details?.retryAfterSeconds || error.response?.headers?.['retry-after'] || 0),
+      });
     }
   }
 );
 
 export const loadAIInteractions = createAsyncThunk(
   'auction/loadAIInteractions',
-  async (auctionId, { rejectWithValue }) => {
+  async ({ auctionId, page = 1, limit = 20 } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/auctions/${auctionId}/ai/interactions`);
+      const response = await api.get(`/auctions/${auctionId}/ai/interactions`, { params: { page, limit } });
       const result = getApiData(response);
       const interactions = Array.isArray(result) ? result : result?.aiInteractions;
       if (!Array.isArray(interactions)) throw new Error('Format riwayat AI tidak valid.');
-      return { interactions, meta: result?.meta || null, auctionId: String(auctionId) };
+      return { interactions, meta: response.data?.meta || result?.meta || null, auctionId: String(auctionId), page };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat AI.');
     }
@@ -520,7 +525,10 @@ const auctionSlice = createSlice({
         // AI pending is handled by socket event
       })
       .addCase(askAI.fulfilled, (state, action) => {
-        // The socket event will handle the actual state update
+        const interaction = action.payload?.interaction;
+        if (sameId(state.active.currentId, action.payload?.auctionId) && interaction) {
+          state.active.publicAIInteractions = mergePublicInteractions(state.active.publicAIInteractions, [interaction], state.active.currentId);
+        }
       })
       .addCase(askAI.rejected, (state, action) => {
         // Error handled in component
