@@ -164,6 +164,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Skala harga lelang terformat memakai lebar container, pertahankan seluruh digit hingga Rp2.000.000.000, dan jaga layout bid/minimum tetap muat.
 - [x] Tombol `Kirim bid` memakai `nextMinimumBid` dari snapshot Redux terbaru saat input kosong; nominal manual tetap dipertahankan, sedangkan request ID, guard eligibility, dan retry idempotent tetap digunakan.
 - [x] Tampilkan WinnerBanner hanya dari hasil lelang yang dikonfirmasi server.
+- [x] Tambahkan ThemeContext global untuk preferensi light/dark, persistensi lokal, toggle navbar yang accessible, dan token styling tanpa menyimpan tema di Redux.
 
 ### REST and backend contract integration
 - [x] Cocokkan register/login/session restore dengan `POST /users/register`, `POST /users/login`, dan `GET /users/me`; frontend menerima JWT `accessToken` backend.

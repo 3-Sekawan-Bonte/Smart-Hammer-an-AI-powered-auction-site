@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d1224" />
+    <script>
+      (() => {
+        let theme;
+        try {
+          const saved = localStorage.getItem('smart-hammer-theme');
+          if (saved === 'light' || saved === 'dark') theme = saved;
+        } catch {}
+        if (!theme) {
+          try {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          } catch {
+            theme = 'light';
+          }
+        }
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <meta name="description" content="Smart Hammer — marketplace lelang elektronik dengan autentikasi, live bidding, realtime, countdown, dan hasil lelang berbasis mock lokal." />
     <title>Smart Hammer — Live Auction</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

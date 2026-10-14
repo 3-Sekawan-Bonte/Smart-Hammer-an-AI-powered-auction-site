@@ -50,6 +50,8 @@ img, svg { display: block; }
 .nav-link { min-height: 38px; display: inline-flex; align-items: center; border-radius: 10px; padding: 0 15px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .nav-link:hover, .nav-link.active { background: var(--ink); color: white; }
 .nav-actions { display: flex; align-items: center; gap: 9px; }
+.theme-toggle { flex: 0 0 auto; min-width: 46px; }
+.theme-toggle-label { white-space: nowrap; }
 .user-chip { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .user-chip > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--cyan-soft); color: var(--green); font-size: 10px; }
 
@@ -358,6 +360,8 @@ textarea.input { min-height: 128px; resize: vertical; }
   .nav-actions .nav-logout { display: inline-flex; }
   .nav-actions .nav-login { display: inline-flex; }
   .nav-actions .btn { min-height: 40px; padding: 0 12px; font-size: 11px; }
+  .nav-actions .theme-toggle { width: 40px; min-width: 40px; padding: 0; }
+  .theme-toggle-label { display: none; }
   .brand { font-size: 18px; }
   .brand-mark { width: 34px; height: 34px; }
   .modern-hero { padding: 53px 0 48px; }
@@ -532,3 +536,122 @@ textarea.input { min-height: 128px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) { .ai-spinner { animation-duration: 2s; } }
 
 .connection-banner { position: sticky; top: 0; z-index: 20; padding: 10px 20px; text-align: center; color: #7a4a00; background: #fff2cf; border-bottom: 1px solid #ecd28c; font-size: 13px; font-weight: 700; }
+
+/* Global dark palette: surface components share the same document-level tokens. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #edf2ff;
+  --ink-soft: #d9e1f3;
+  --muted: #a4aec4;
+  --paper: #101522;
+  --surface: #171f30;
+  --surface-soft: #202b40;
+  --primary: #91a0ff;
+  --primary-dark: #7888f0;
+  --cyan: #b7c4ff;
+  --cyan-soft: #26314e;
+  --green: #58d4a7;
+  --line: #303c53;
+  --line-dark: rgba(255,255,255,.16);
+  --shadow: 0 24px 70px rgba(0,0,0,.34);
+  --shadow-card: 0 14px 36px rgba(0,0,0,.28);
+}
+
+:root[data-theme="dark"] body { background: var(--paper); color: var(--ink); }
+:root[data-theme="dark"] .topbar { border-color: var(--line); background: rgba(16,21,34,.9); }
+:root[data-theme="dark"] .nav-links,
+:root[data-theme="dark"] .btn-ghost,
+:root[data-theme="dark"] .market-strip,
+:root[data-theme="dark"] .category-row button,
+:root[data-theme="dark"] .search-wrap,
+:root[data-theme="dark"] .filter,
+:root[data-theme="dark"] .auth-panel,
+:root[data-theme="dark"] .input,
+:root[data-theme="dark"] .form-card,
+:root[data-theme="dark"] .room-panel,
+:root[data-theme="dark"] .currency-input,
+:root[data-theme="dark"] .bid-input,
+:root[data-theme="dark"] .quick-bid,
+:root[data-theme="dark"] .bid-history-panel,
+:root[data-theme="dark"] .ai-panel,
+:root[data-theme="dark"] .loading-card,
+:root[data-theme="dark"] .error-card,
+:root[data-theme="dark"] .empty-state,
+:root[data-theme="dark"] .success-banner,
+:root[data-theme="dark"] .auction-skeleton,
+:root[data-theme="dark"] .footer,
+:root[data-theme="dark"] .detail-main-card,
+:root[data-theme="dark"] .detail-side-card,
+:root[data-theme="dark"] .confirm-dialog,
+:root[data-theme="dark"] .winner-banner {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+:root[data-theme="dark"] .topbar { background-color: rgba(16,21,34,.9); }
+:root[data-theme="dark"] .btn-ghost { border-color: var(--line); }
+:root[data-theme="dark"] .nav-link:hover,
+:root[data-theme="dark"] .nav-link.active,
+:root[data-theme="dark"] .category-row button:hover,
+:root[data-theme="dark"] .category-row button.active { background: #303b5a; border-color: #46557d; color: white; }
+:root[data-theme="dark"] .btn-dark,
+:root[data-theme="dark"] .brand-mark,
+:root[data-theme="dark"] .modern-hero,
+:root[data-theme="dark"] .feature-band,
+:root[data-theme="dark"] .auth-art,
+:root[data-theme="dark"] .side-card,
+:root[data-theme="dark"] .preview-category,
+:root[data-theme="dark"] .skip-link { background: #0b1120; color: #f5f7ff; }
+:root[data-theme="dark"] .brand-mark { color: var(--cyan); }
+:root[data-theme="dark"] .feature { background: #0b1120; }
+:root[data-theme="dark"] .btn-amber { color: #251b09; }
+:root[data-theme="dark"] .ai-message.user { border-color: #3f4d70; background: #293453; color: #edf2ff; }
+:root[data-theme="dark"] .ai-message.user .ai-label { color: #c2ceff; }
+:root[data-theme="dark"] .ai-answer-label,
+:root[data-theme="dark"] .ai-commentary-label,
+:root[data-theme="dark"] .ai-inline-citation,
+:root[data-theme="dark"] .ai-sources a { color: #aebaff; }
+:root[data-theme="dark"] .ai-missing { border-color: #5e512d; color: #f0d58c; }
+:root[data-theme="dark"] .error-card { border-color: #713b49; color: #ffb5c1; }
+:root[data-theme="dark"] .winner-banner .winner-name { color: #8ce5bf !important; }
+:root[data-theme="dark"] .auth-panel { background-color: var(--paper); }
+:root[data-theme="dark"] .room-page { background: #0d1320; }
+:root[data-theme="dark"] .bid-zone { background: linear-gradient(180deg, #192235, #141c2b); }
+:root[data-theme="dark"] .bid-input { background: var(--surface); color: var(--ink); }
+:root[data-theme="dark"] .bid-history-panel { background-color: var(--surface); }
+:root[data-theme="dark"] .tab.active { background: #303b57; color: var(--ink); }
+:root[data-theme="dark"] .market-strip-inner strong { color: var(--ink); }
+:root[data-theme="dark"] .ai-feed { background: #111827; }
+:root[data-theme="dark"] .ai-message,
+:root[data-theme="dark"] .ai-interaction { border-color: #35425f; background: #202a42; color: #e5eaff; }
+:root[data-theme="dark"] .ai-question p,
+:root[data-theme="dark"] .ai-answer { color: #e1e7ff; }
+:root[data-theme="dark"] .ai-answer { background: #293453; }
+:root[data-theme="dark"] .ai-disclosure { background: #202a3e; color: #bac5db; }
+:root[data-theme="dark"] .ai-empty { border-color: #3b4860; }
+:root[data-theme="dark"] .ai-question-form textarea { border-color: var(--line); background: var(--surface); color: var(--ink); }
+:root[data-theme="dark"] .detail-description { color: #cbd4e8; }
+:root[data-theme="dark"] .detail-image { background: #1a2335; }
+:root[data-theme="dark"] .listing-preview { border-color: #394767; background: linear-gradient(135deg, #202a41, #1a3037); }
+:root[data-theme="dark"] .badge-ended { background: #30394b; color: #e2e8f5; }
+:root[data-theme="dark"] .winner-banner-success { border-color: #285843; background: linear-gradient(110deg, #18372d, #172a27 70%); }
+:root[data-theme="dark"] .winner-banner-empty { border-color: var(--line); background: #1b2434; }
+:root[data-theme="dark"] .winner-banner-loading { border-color: #61502d; background: #30291d; }
+:root[data-theme="dark"] .bid-row.latest { background: #1d332f; }
+:root[data-theme="dark"] .auction-skeleton div,
+:root[data-theme="dark"] .auction-skeleton span { background-image: linear-gradient(90deg, #242d3e 25%, #303b50 50%, #242d3e 75%); }
+:root[data-theme="dark"] .form-error,
+:root[data-theme="dark"] .bid-feedback-error { border-color: #713b49; background: #3a222d; color: #ffb5c1; }
+:root[data-theme="dark"] .bid-feedback-warning,
+:root[data-theme="dark"] .bid-history-error { border-color: #66552f; background: #342d1e; color: #f2d58c; }
+:root[data-theme="dark"] .field-error { color: #ff9ca9; }
+:root[data-theme="dark"] .bid-success,
+:root[data-theme="dark"] .notice-card,
+:root[data-theme="dark"] .connection { border-color: #285843; background: #19352e; color: #8ce5bf; }
+:root[data-theme="dark"] .connection.unavailable,
+:root[data-theme="dark"] .connection.disconnected { border-color: var(--line); background: var(--surface-soft); color: var(--muted); }
+:root[data-theme="dark"] .timer-large { background: #442630; color: #ff9ba5; }
+:root[data-theme="dark"] .countdown-card { border-color: #394767; background: linear-gradient(135deg, #202a41, #1c2739); }
+:root[data-theme="dark"] .countdown-confirming { color: #f2d58c; }
+:root[data-theme="dark"] .connection-banner { border-color: #66552f; background: #342d1e; color: #f2d58c; }
+:root[data-theme="dark"] .preview-card { background: rgba(19,25,45,.94); }
+:root[data-theme="dark"] .badge-draft { color: #f5d98a; background: #493b20; }

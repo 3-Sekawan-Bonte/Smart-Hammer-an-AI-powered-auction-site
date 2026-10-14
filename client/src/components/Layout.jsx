@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { GavelIcon, LogoutIcon } from './Icons';
+import { useTheme } from '../contexts/ThemeContext';
+import { GavelIcon, LogoutIcon, MoonIcon, SunIcon } from './Icons';
 import ConnectionBanner from './ConnectionBanner';
 
 function Brand() {
@@ -9,6 +10,7 @@ function Brand() {
 
 export default function Layout() {
   const { user, isAuthenticated, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const handleLogout = () => {
     logout();
@@ -26,6 +28,17 @@ export default function Layout() {
             <NavLink className="nav-link" to="/auctions/new">Jual barang</NavLink>
           </nav>
           <div className="nav-actions">
+            <button
+              className="btn btn-ghost theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
+              aria-pressed={theme === 'dark'}
+              title={theme === 'dark' ? 'Mode gelap aktif' : 'Mode terang aktif'}
+            >
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+              <span className="theme-toggle-label">{theme === 'dark' ? 'Terang' : 'Gelap'}</span>
+            </button>
             {isAuthenticated ? (
               <>
                 <span className="user-chip"><span>{user?.username?.slice(0, 2).toUpperCase()}</span>{user?.username}</span>
