@@ -41,6 +41,19 @@ function safeProductContext(auction, snapshotAt) {
 
 function interactionToJSON(interaction) {
   const value = typeof interaction.toJSON === 'function' ? interaction.toJSON() : interaction;
+  const sources = value.kind === 'question' && value.visibility === 'private' && Array.isArray(value.sources)
+    ? value.sources.slice(0, 10).filter((source) => {
+      if (!source || typeof source.title !== 'string' || typeof source.url !== 'string') return false;
+      try {
+        const url = new URL(source.url);
+        return url.protocol === 'https:' && !url.username && !url.password && url.href.length <= 2048;
+      } catch (_error) { return false; }
+    }).map((source) => ({
+      reference: String(source.reference || '').slice(0, 8),
+      title: source.title.slice(0, 200),
+      url: source.url,
+    }))
+    : [];
   return {
     id: value.id,
     auctionId: value.auctionId,
@@ -50,6 +63,7 @@ function interactionToJSON(interaction) {
     question: value.question,
     answer: value.answer,
     missingInformation: Array.isArray(value.missingInformation) ? value.missingInformation : [],
+    sources,
     status: value.status,
     sourceVersion: value.sourceVersion,
     snapshotAt: value.snapshotAt ? new Date(value.snapshotAt).toISOString() : null,
@@ -111,8 +125,9 @@ function createAIInteractionService({
       kind: 'question',
       visibility: 'private',
       question,
-      answer: null,
-      missingInformation: [],
+        answer: null,
+        missingInformation: [],
+        sources: [],
       status: 'pending',
       sourceVersion: auction.version,
       snapshotAt,
@@ -128,7 +143,7 @@ function createAIInteractionService({
       const diagnosticCode = PROVIDER_DIAGNOSTIC_CODES.has(error?.code) ? error.code : 'AI_UNAVAILABLE';
       logProviderFailure(diagnosticCode, error?.statusCode);
       try {
-        await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode });
+        await interaction.update({ status: 'failed', answer: null, missingInformation: [], sources: [], errorCode });
         publish('ai:error', interaction, 'The AI answer service is temporarily unavailable.');
       } catch (_persistError) {
         // No error event is sent unless the failed state was persisted.
@@ -140,12 +155,13 @@ function createAIInteractionService({
       await interaction.update({
         answer: result.answer,
         missingInformation: result.missingInformation,
+        sources: Array.isArray(result.sources) ? result.sources : [],
         status: 'completed',
         errorCode: null,
       });
       publish('ai:message', interaction);
     } catch (_error) {
-      try { await interaction.update({ status: 'failed', answer: null, missingInformation: [], errorCode: 'AI_UNAVAILABLE' }); } catch (_persistError) { /* Database failure prevents recording the final state. */ }
+      try { await interaction.update({ status: 'failed', answer: null, missingInformation: [], sources: [], errorCode: 'AI_UNAVAILABLE' }); } catch (_persistError) { /* Database failure prevents recording the final state. */ }
       throw new HttpError(500, 'INTERNAL_ERROR', 'The AI interaction could not be saved.');
     }
     return interaction;

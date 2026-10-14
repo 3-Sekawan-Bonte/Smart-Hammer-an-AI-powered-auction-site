@@ -4,7 +4,7 @@
 
 Smart Hammer adalah aplikasi simulasi lelang barang elektronik. Seller membuat dan memulai lelang, buyer melihat detail produk serta mengajukan penawaran, dan semua peserta melihat harga, riwayat bid, komentar AI, serta hasil lelang secara real-time.
 
-AI memiliki dua fungsi utama: **Product Q&A** untuk menjawab pertanyaan tentang barang berdasarkan fakta yang tersimpan dan **AI Auctioneer** untuk memberi komentar pada momen penting lelang. AI hanya menjadi pemandu informasi; backend tetap menentukan bid yang valid, harga, waktu penutupan, dan pemenang.
+AI memiliki dua fungsi utama: **Product Q&A** untuk menjawab berdasarkan fakta tersimpan dan, bila pertanyaan membutuhkannya, informasi eksternal dari Groq Browser Search dengan sumber yang ditautkan; serta **AI Auctioneer** untuk komentar publik pada momen penting lelang. Q&A privat per user, sedangkan komentar Auctioneer publik. AI hanya menjadi pemandu informasi; backend tetap menentukan bid yang valid, harga, waktu penutupan, dan pemenang.
 
 Aplikasi ini menggunakan nominal simulasi. MVP tidak memproses uang nyata, pembayaran, pengiriman, atau wallet.
 
@@ -59,7 +59,7 @@ Seller tidak boleh menawar lelangnya sendiri. Dashboard admin terpisah tidak ter
 5. Real-time update menggunakan Socket.IO.
 6. Countdown dengan sliding deadline.
 7. Penutupan lelang dan penentuan pemenang oleh backend.
-8. Product Q&A yang menyimpan status dan jawaban.
+8. Product Q&A privat yang menyimpan status, jawaban, dan sumber web terverifikasi bila pencarian digunakan.
 9. AI Auctioneer untuk pembukaan, milestone bid, dan akhir lelang.
 10. Pemulihan state sesudah refresh/reconnect serta handling kegagalan AI.
 
@@ -93,7 +93,7 @@ Fitur tambahan baru dipertimbangkan setelah alur MVP stabil dan kebutuhan dasarn
 Redux Toolkit digunakan untuk state global yang dibagikan antarhalaman. Slice awal:
 
 - `auth`: user, access token, status autentikasi, loading/error.
-- `auction`: snapshot lelang aktif, riwayat bid, interaksi AI publik, version, loading/error.
+- `auction`: snapshot lelang aktif, riwayat bid, komentar AI publik, Q&A privat pemilik, version, loading/error.
 - `socket`: status koneksi saja; bukan instance socket.
 
 Gunakan `configureStore`, `createSlice`, `createAsyncThunk`, `Provider`, `useSelector`, dan `useDispatch`. Permintaan REST asynchronous seperti login, pemulihan sesi, load snapshot, submit bid, dan ask AI dapat dikelola melalui thunk. Instance Socket.IO berada di service terpisah; event socket men-dispatch action Redux. Redux hanya menyimpan data serializable, bukan instance Socket.IO, Promise, atau Error object. Input form dan countdown tick tetap local state. Backend/PostgreSQL tetap sumber kebenaran.

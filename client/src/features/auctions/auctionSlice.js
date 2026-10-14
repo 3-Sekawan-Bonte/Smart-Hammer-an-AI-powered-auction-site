@@ -206,7 +206,7 @@ export const askAI = createAsyncThunk(
   async ({ auctionId, question }, { rejectWithValue, getState }) => {
     const userId = getState().auth.user?.id ?? null;
     try {
-      const response = await api.post(`/auctions/${auctionId}/ai/questions`, { question });
+      const response = await api.post(`/auctions/${auctionId}/ai/questions`, { question }, { timeout: 60000 });
       return { ...getApiData(response), auctionId: String(auctionId), userId };
     } catch (error) {
       return rejectWithValue({

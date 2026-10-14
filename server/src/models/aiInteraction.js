@@ -15,6 +15,7 @@ class AIInteraction extends Model {
       question: { type: DataTypes.STRING(500), allowNull: true },
       answer: { type: DataTypes.TEXT, allowNull: true },
       missingInformation: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
+      sources: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'pending', validate: { isIn: [statuses] } },
       sourceVersion: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 0 } },
       snapshotAt: { type: DataTypes.DATE, allowNull: false },

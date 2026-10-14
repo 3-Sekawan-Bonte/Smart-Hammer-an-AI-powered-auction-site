@@ -61,6 +61,18 @@ describe('AI interaction service', () => {
     expect(provider.answerQuestion).toHaveBeenCalledTimes(1);
   });
 
+  test('persists source metadata on private Q&A and strips it from public commentary serialization', async () => {
+    const sources = [{ reference: '1', title: 'Sony Indonesia', url: 'https://www.sony.co.id/product' }];
+    const state = setup({ provider: { answerQuestion: async () => ({ answer: 'Harga baru berdasarkan sumber【1†L1-L2】.', missingInformation: [], sources }) } });
+    const question = await state.service.ask(22, 9, 'Berapa harga baru Sony ini?');
+    expect(question.sources).toEqual(sources);
+    expect(interactionToJSON(question).sources).toEqual(sources);
+
+    expect(interactionToJSON({
+      id: 12, auctionId: 9, kind: 'commentary', visibility: 'public', sources,
+    }).sources).toEqual([]);
+  });
+
   test('broadcasts each Q&A state only after persistence to the corresponding auction room publisher', async () => {
     const timeline = [];
     const eventPublisher = { publishPrivateAIInteraction: jest.fn((userId, event, payload) => {
