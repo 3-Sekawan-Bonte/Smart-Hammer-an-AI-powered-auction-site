@@ -1,4 +1,5 @@
 export const AUCTION_DURATION_OPTIONS = [
+  { label: '3 menit', seconds: 180 },
   { label: '1 day', seconds: 86_400 },
   { label: '3 days', seconds: 259_200 },
   { label: '7 days', seconds: 604_800 },
