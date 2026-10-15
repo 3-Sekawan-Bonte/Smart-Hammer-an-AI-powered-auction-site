@@ -85,7 +85,7 @@ Fitur tambahan baru dipertimbangkan setelah alur MVP stabil dan kebutuhan dasarn
 - Event real-time dikirim setelah transaksi database berhasil commit.
 - API key dan JWT secret hanya berada di backend.
 - Struktur folder menggunakan `client/` dan `server/`.
-- Deployment: frontend di Vercel, backend di Railway.
+- Deployment target: frontend di Vercel (`https://smart-hammer.ilham.bond`), backend di Google Compute Engine (`https://smart-hammer-server.ilham.bond`), PostgreSQL di Supabase.
 
 
 ## 8. State management frontend

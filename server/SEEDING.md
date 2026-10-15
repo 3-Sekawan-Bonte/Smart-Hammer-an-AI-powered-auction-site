@@ -17,7 +17,10 @@ DEMO_SEED_PASSWORD=choose-a-local-password-of-at-least-8-characters
 
 Never use a production password. `DEMO_SEED_PASSWORD` must be 8–72 UTF-8 bytes.
 The seeder refuses to run when `NODE_ENV=production`, and it also requires the
-explicit `DEMO_SEED_ENABLED=true` opt-in.
+explicit `DEMO_SEED_ENABLED=true` opt-in. The supported `npm run seed:demo`
+script pins Sequelize CLI to the development environment. The seeder checks
+`NODE_ENV`, not the CLI `--env` option by itself; never invoke it with
+`--env production`, and keep demo seeding disabled on production hosts.
 
 ## Run
 

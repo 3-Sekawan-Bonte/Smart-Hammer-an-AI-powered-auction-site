@@ -10,7 +10,7 @@ From `server/`, copy `.env.test.example` to `.env.test` and fill in the local
 PostgreSQL credentials. Alternatively, configure `TEST_DATABASE_URL` with a
 dedicated database whose name ends in `_test`. `.env.test` is ignored by Git.
 
-The six current Sequelize migrations are applied automatically by `npm test`
+Pending Sequelize migrations are applied automatically by `npm test`
 before Jest starts. To provision an empty test database for the first time,
 run:
 
@@ -26,7 +26,7 @@ npm run db:migrate:status:test
 ```
 
 `npm test` runs only pending migrations; it does not drop, reset, truncate, or
-seed the test database. Each integration suite creates uniquely identified
+seed the test database. Each database integration suite creates uniquely identified
 records and deletes only records associated with those IDs/emails. Do not set
 `TEST_DATABASE_URL` to a development or production database.
 
