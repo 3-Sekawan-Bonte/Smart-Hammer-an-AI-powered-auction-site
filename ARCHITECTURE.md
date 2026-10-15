@@ -469,9 +469,9 @@ Buat `.env.example` tanpa nilai secret. `.env`, `node_modules`, token, dan crede
 ## 12. Deployment
 
 - Frontend: **Vercel** (static SPA build dari Vite).
-- Backend: **Railway** (Node.js service dengan PostgreSQL add-on atau database terpisah).
+- Backend: **Google Compute Engine** (`https://smart-hammer-server.ilham.bond`) dengan PostgreSQL di Supabase.
 - Pastikan `CLIENT_ORIGIN` pada backend sesuai URL Vercel yang di-deploy.
-- Pastikan `VITE_API_BASE_URL` dan `VITE_SOCKET_URL` pada frontend mengarah ke URL Railway.
+- Pastikan `VITE_API_BASE_URL` dan `VITE_SOCKET_URL` pada frontend mengarah ke `https://smart-hammer-server.ilham.bond`.
 - Siapkan demo lokal sebagai cadangan.
 
 ## 13. Testing strategy

@@ -172,6 +172,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Gunakan kategori backend yang diizinkan dan kirim field `category` dari form.
 - [ ] Tawarkan pilihan durasi 1, 3, dan 7 hari; verifikasi melalui browser bahwa nilai detik terkirim dan pilihan draft tetap tampil.
 - [x] Cocokkan respons bid/idempotency, tampilkan minimum bid dari state backend, dan sediakan `GET /auctions/:id/bids` terpaginasikan tanpa membocorkan idempotency key.
+- [x] Sertakan username publik bidder secara konsisten pada respons bid, riwayat, snapshot, dan event `bid:updated`; jangan sertakan data akun privat.
 - [x] Cocokkan Product Q&A dan riwayat AI dengan API; Q&A privat per pemilik, sedangkan commentary Auctioneer tetap publik.
 - [x] Konfigurasikan URL API/Socket.IO frontend, CORS Express, dan CORS Socket.IO memakai origin yang dikonfigurasi.
 
@@ -182,7 +183,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [x] Jalankan frontend dan backend automated test suites serta production bundle verification.
 - [ ] Verifikasi browser dua akun melawan backend nyata untuk seller → buyer → bid → AI → auction ended, termasuk reconnect dan viewport kecil.
 - [ ] Verifikasi tampilan responsif lewat browser pada ukuran layar yang didukung.
-- [ ] Dokumentasikan install, env, migration, seed, run, test, dan demo lokal pada README/setup guide.
+- [x] Dokumentasikan install, env, migration, seed, run, test, dan demo lokal pada README/setup guide.
 
 **Checkpoint:** alur end-to-end seller → buyer → AI → bid → auction ended berjalan dari UI.
 
@@ -210,7 +211,7 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Pastikan tidak ada `.env`, token, atau API key dalam repository/build frontend.
 - [ ] Siapkan akun demo dan data lelang yang dapat diulang.
 - [ ] Siapkan demo lokal sebagai cadangan jika deployment gagal.
-- [ ] Deploy frontend ke Vercel dan backend ke Railway.
+- [ ] Deploy frontend ke Vercel dan backend ke Google Compute Engine dengan PostgreSQL Supabase.
 
 **Checkpoint:** satu skenario end-to-end dapat diulang tanpa mengedit data database secara manual.
 

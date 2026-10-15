@@ -1,67 +1,636 @@
 # Smart Hammer
 
-Frontend auction marketplace for electronics. FE-01 and FE-02 foundations plus the FE-03 seller auction lifecycle are implemented against a development-only mock API. Production authentication, transactional bidding, realtime synchronization, and AI features depend on their backend phases.
+Smart Hammer is an electronics auction application for sellers and buyers. Sellers create and start listings; authenticated buyers place rupiah bids and follow the auction in real time. Product Q&A uses stored listing facts and, for selected external questions, Groq Browser Search. AI Auctioneer commentary accompanies important auction events.
 
-## Requirements
+The project demonstrates a complete auction lifecycle with persistent PostgreSQL state, server-side bid validation, Socket.IO updates, and AI-assisted product information. It uses simulated amounts only: there are no real payments, wallets, delivery workflows, or Midtrans integration.
 
-- Node.js 20.19+ or 22.12+ (Vite 8 requirement)
-- npm
+## Features
 
-## Setup and run
+- Username, email, and password registration; JWT login and session restoration.
+- Auction drafts, seller-owned editing, category and title search, and 1, 3, or 7 day durations.
+- Real-time bids with server-checked minimum increments, request idempotency, bidder usernames, and deadline extension.
+- Auction countdown, automatic backend closure, winner/no-bid result, and recovery after server restart.
+- Private Product Q&A per signed-in user, with saved answers and validated source links when Groq Browser Search is selected; AI uses Groq GPT-OSS 120B by default.
+- Public AI Auctioneer commentary at auction start, every third accepted bid, and auction end.
+- Light and dark theme preference managed with React Context.
 
-From the repository root:
+The seller supplies listing details; those statements are not independently verified. PostgreSQL and the backend decide whether a bid is accepted, the current price, auction status and deadline, and the final result. AI output is informational and cannot modify auction state.
 
-```sh
-npm run setup
-npm run mock
-```
+## Technology
 
-In a second terminal:
+React 19, Vite, Tailwind CSS 4, React Router, Redux Toolkit, React Context, Axios, Socket.IO Client, Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT, bcryptjs, Groq Chat Completions API, Jest, and Supertest.
 
-```sh
-npm run dev
-```
+## Architecture
 
-The frontend runs at `http://localhost:5173`; the mock API listens at `http://localhost:3001`. Set `BIDWAR_MOCK_PORT` to change the mock port. Set `BIDWAR_MOCK_DB` to use a separate local database file for isolated demos or QA.
+The `client/` Vite SPA calls the authenticated REST API and joins Socket.IO auction rooms. Redux Toolkit holds serializable authentication and auction state; a separate service owns the socket connection. The `server/` Express application routes requests through middleware, controllers, services, and Sequelize models. PostgreSQL is the durable source of truth. See [Architecture](docs/ARCHITECTURE.md) for component boundaries and data relationships.
 
-Copy `client/.env.example` to `client/.env.local` to override `VITE_API_BASE_URL`. `VITE_SOCKET_URL` stays blank because realtime bidding is outside FE-03. Do not put secrets in Vite variables; they are exposed to the browser.
+## Run locally
 
-## Demo accounts
+Prerequisites: Node.js 20.19+ or 22.12+, npm, and PostgreSQL. Install each application's dependencies with `npm ci`, configure `server/.env` from `server/.env.example` and `client/.env` from `client/.env.example`, create and migrate a local database, then start the backend and frontend in separate terminals. The browser app defaults to `http://localhost:5173`; the backend defaults to `http://localhost:3000`.
 
-The local fixture has a buyer account (`demo@smart-hammer.id`) and seller account (`seller@smart-hammer.id`); both use password `smart123`. These credentials are only for the local mock. Registering creates an account but does not sign the user in; log in after registration.
+Follow [Local setup](docs/SETUP.md) for exact commands, demo seeding, and test database setup. Environment variable meanings are in [Environment reference](docs/ENVIRONMENT.md).
 
-Authenticated users can browse public live and ended auctions, view auction details, and create private seller drafts. Owners can edit their own drafts and start them. Drafts do not appear in the public listing. `/my-auctions` remembers auctions created from the current browser for that user and retrieves each through the owner-protected detail endpoint; this local list is not a cross-device seller dashboard because `/me/auctions` is not part of the available API. Mock changes persist to `client/mock/db.json` by default; use `BIDWAR_MOCK_DB` for a disposable database.
+## Documentation
 
-The mock supports authentication, auction listing/details, draft creation/editing, and draft start. It deliberately does not implement bidding or AI questions. Socket.IO is not used to claim realtime state. The mock is for local development and is not production persistence or authorization infrastructure.
+- [Local setup](docs/SETUP.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [REST API and Socket.IO](docs/API.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [User guide](docs/USER_GUIDE.md)
+- [Environment reference](docs/ENVIRONMENT.md)
+- [Backend testing guide](server/TESTING.md)
+- [Demo seeding guide](server/SEEDING.md)
+- [Project requirements](PROJECT.md), [PRD](PRD.md), [implementation architecture](ARCHITECTURE.md), and [task checklist](TASKS.md)
 
-## Backend AI provider
-
-Product Q&A and AI Auctioneer use Groq Chat Completions with `openai/gpt-oss-120b`. For backend development, copy `server/.env.example` to `server/.env`, configure the database and JWT settings, and set `GROQ_API_KEY` in that server-only file. `GROQ_MODEL` defaults to `openai/gpt-oss-120b`. Never place the key in `client/.env*` or a `VITE_*` variable. Start the backend from `server/` with `npm start`; AI provider tests use mocks and do not require a live key.
-
-To use Groq locally, create a key in your Groq account and add it to `server/.env` as `GROQ_API_KEY=<your-key>`. The server sends raw HTTP requests to `https://api.groq.com/openai/v1/chat/completions` with medium reasoning effort and validates the JSON response before saving or broadcasting it. No Groq SDK is required. Do not share or commit the key. Live provider behavior has not been verified by the automated tests.
-
-## FE-03 routes and API
-
-- `/` — public auction catalog from `GET /auctions`, including response pagination metadata.
-- `/auctions/new` — create a draft with `POST /auctions`.
-- `/auctions/:id/edit` — owner-only draft editing with `PATCH /auctions/:id`.
-- `/auctions/:id` — auction snapshot from `GET /auctions/:id`; owner draft actions include edit and `POST /auctions/:id/start`.
-- `/my-auctions` — browser-known auctions retrieved through authenticated detail requests.
-
-Auction category is always `electronics`. Draft forms validate the documented API limits for title, description, condition, HTTPS image URL, integer IDR prices, duration, and product facts. PATCH replaces the complete `productFacts` object, so the form submits all fact fields to preserve unchanged values. The server determines the seller, status, and start/end timestamps.
-
-See [FE03_IMPLEMENTATION_REPORT.md](FE03_IMPLEMENTATION_REPORT.md) for verified scope, tests, visual checks, compliance, and limitations.
-
-## Verification
+## Tests and production build
 
 ```sh
-cd client
-npm test
-npm run build
+(cd client && npm test)
+(cd client && npm run build:production)
+(cd server && npm test)
 ```
 
-Tests use temporary mock databases and remove them afterwards. See [FE01_CHANGELOG.md](FE01_CHANGELOG.md), [FE02_CHANGELOG.md](FE02_CHANGELOG.md), and [FE03_IMPLEMENTATION_REPORT.md](FE03_IMPLEMENTATION_REPORT.md) for the respective scopes. Existing UI audit screenshots are in [`client/ui-audit/screenshots/`](client/ui-audit/screenshots/).
+Frontend tests use the local mock API and Socket.IO server for integration scenarios. The complete backend test command migrates and uses a dedicated PostgreSQL database; see the [testing guide](server/TESTING.md). Production frontend builds require valid HTTPS API and Socket.IO URLs.
 
-## Remaining roadmap
+## Current deployment target
 
-Production database-backed auction APIs are still tracked under Phase 3 in `TASKS.md`. FE-04 room state, socket synchronization, bidding, auction closure, and AI are not marked complete by FE-03.
+The configured target is the frontend at [smart-hammer.ilham.bond](https://smart-hammer.ilham.bond), the backend at [smart-hammer-server.ilham.bond](https://smart-hammer-server.ilham.bond), PostgreSQL on Supabase, and Groq for AI. These target URLs are project-provided configuration, not a claim that a production deployment was verified in this repository. See [Deployment](docs/DEPLOYMENT.md).
+
+## Limitations and planned work
+
+Smart Hammer is a simulated auction: it does not charge users or process payment, shipping, or wallets. Product condition and seller claims are not independently verified; external AI research does not authenticate the item being auctioned. Production deployment, two-account browser verification against the live backend, and several responsive/browser checks remain tracked in `TASKS.md`. Midtrans, upload-based images, auto-bidding, watchlists, and multi-server scaling are not implemented.
+
+## REST API Reference
+
+The backend mounts REST routes at `/users` and `/auctions` with no additional `/api` prefix. Examples use `http://localhost:3000`; substitute the backend URL for another environment. Send JSON mutation bodies with `Content-Type: application/json`. Authenticated routes require `Authorization: Bearer <JWT>` using the access token returned by login. The API derives the caller's identity from that verified token.
+
+Successful responses use a JSON object with `message` and `data`; paginated responses also include `meta`. Errors use `{ "message": "...", "error": { "code": "...", "fields": {}, "details": {} } }`. Validation errors use HTTP 400 and put field-specific messages in `error.fields`. Unexpected server errors use HTTP 500 and the generic message `An unexpected error occurred.`. The examples below show the implemented response fields; IDs, timestamps, and generated AI text are illustrative.
+
+### Authentication and Users
+
+#### Register
+
+**Method:** POST\
+**Path:** `/users/register`\
+**Purpose:** Create an account. Email is trimmed and lowercased; passwords are hashed before storage.\
+**Authentication:** Not required.\
+**Required headers:** `Content-Type: application/json`.
+
+**Path parameters:** None.\
+**Query parameters:** None.
+
+**Request body:** JSON object; all fields are required. Unknown fields are rejected.
+
+| Field | Type | Required | Validation |
+|---|---|---:|---|
+| `username` | string | Yes | Trimmed; 2–40 characters. |
+| `email` | string | Yes | Valid email address; at most 254 characters; normalized to lowercase. |
+| `password` | string | Yes | At least 8 characters and at most 72 UTF-8 bytes. |
+
+**Example request:**
+
+```bash
+curl -X POST "http://localhost:3000/users/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"Rina","email":"rina@example.test","password":"example-pass-123"}'
+```
+
+**Success response:** HTTP 201.
+
+```json
+{
+  "message": "User registered successfully.",
+  "data": { "user": { "id": 41, "username": "Rina", "email": "rina@example.test" } }
+}
+```
+
+The returned user contains `id` (integer), `username`, and normalized `email`. Passwords and hashes are not returned.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid, missing, or unknown fields; HTTP 409 `EMAIL_EXISTS` when the email is already registered; HTTP 500 `INTERNAL_ERROR` for an unexpected server or database failure.
+
+**Additional behavior:** Registration does not create a login token. Log in separately to receive one.
+
+#### Login
+
+**Method:** POST\
+**Path:** `/users/login`\
+**Purpose:** Verify account credentials and issue a signed JWT.\
+**Authentication:** Not required.\
+**Required headers:** `Content-Type: application/json`.
+
+**Path parameters:** None.\
+**Query parameters:** None.
+
+**Request body:** JSON object; both fields are required. Unknown fields are rejected.
+
+| Field | Type | Required | Validation |
+|---|---|---:|---|
+| `email` | string | Yes | Valid email address; trimmed and lowercased before lookup. |
+| `password` | string | Yes | Nonempty string. |
+
+**Example request:**
+
+```bash
+curl -X POST "http://localhost:3000/users/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"rina@example.test","password":"example-pass-123"}'
+```
+
+**Success response:** HTTP 200.
+
+```json
+{
+  "message": "Login successful.",
+  "data": {
+    "user": { "id": 41, "username": "Rina", "email": "rina@example.test" },
+    "accessToken": "<JWT>"
+  }
+}
+```
+
+`accessToken` is the bearer token for protected requests. Its signing secret is server-side; expiration is configured by `JWT_EXPIRES_IN` (defaults to seven days).
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid fields; HTTP 401 `INVALID_CREDENTIALS` for an unknown email or incorrect password; HTTP 500 `INTERNAL_ERROR` for unexpected failures, including unavailable JWT configuration.
+
+**Additional behavior:** Unknown email and wrong password use the same response to avoid distinguishing those cases.
+
+#### Get current user
+
+**Method:** GET\
+**Path:** `/users/me`\
+**Purpose:** Return the user represented by the verified JWT.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`.
+
+**Path parameters:** None.\
+**Query parameters:** None.\
+**Request body:** No request body is required.
+
+**Example request:**
+
+```bash
+curl "http://localhost:3000/users/me" -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200.
+
+```json
+{
+  "message": "Authenticated user retrieved successfully.",
+  "data": { "user": { "id": 41, "username": "Rina", "email": "rina@example.test" } }
+}
+```
+
+**Error responses:** HTTP 401 `UNAUTHORIZED` for a missing, invalid, or expired token, or when its user no longer exists; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+### Auction Listings and Details
+
+Auction objects use integer rupiah values and contain `id`, `sellerId`, `title`, `description`, `condition`, `category`, `productFacts`, `imageUrl`, `startingPrice`, `currentPrice`, `bidCount`, `nextMinimumBid`, `minIncrement`, `durationSeconds`, `startsAt`, `endsAt`, `status`, `finalPrice`, `highestBidderId`, `winnerId`, `version`, `createdAt`, `updatedAt`, and public `seller`, `highestBidder`, and `winner` summaries (`{id, username}` or `null`). `bidCount` and `nextMinimumBid` may be `null` when not available or applicable. `productFacts` contains `specifications`, `defects`, `accessories`, and `warranty`.
+
+#### List auctions
+
+**Method:** GET\
+**Path:** `/auctions`\
+**Purpose:** Return a paginated auction listing with optional filters.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`.
+
+**Path parameters:** None.\
+**Query parameters:** All are optional; unknown parameters are rejected.
+
+| Parameter | Type | Default | Validation and behavior |
+|---|---|---:|---|
+| `page` | positive integer | `1` | Page number. |
+| `limit` | positive integer | `10` | Maximum `50`. |
+| `status` | string | None | `draft`, `live`, or `ended`. Drafts are only listed when `seller=me`. |
+| `category` | string | None | `smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, or `accessories`. |
+| `seller` | string | None | Only `me` is accepted; returns the authenticated seller's auctions, including drafts. Arbitrary seller IDs are not supported. |
+| `search` | string | None | Case-insensitive title substring search; at most 120 characters. |
+
+Without `seller=me`, the default listing includes live and ended auctions and excludes drafts. Results sort by creation time descending, then ID descending.
+
+**Request body:** No request body is required.
+
+**Example request:**
+
+```bash
+curl "http://localhost:3000/auctions?status=live&category=camera&page=1&limit=10&search=Sony" \
+  -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200.
+
+```json
+{
+  "message": "Auctions retrieved successfully.",
+  "data": [
+    {
+      "id": 8, "sellerId": 41, "title": "Sony Alpha camera",
+      "description": "Mirrorless camera in good working condition.",
+      "condition": "used_good", "category": "camera",
+      "productFacts": { "specifications": "24 MP sensor", "defects": null, "accessories": [], "warranty": null },
+      "imageUrl": null, "startingPrice": 1000000, "currentPrice": 1000000,
+      "bidCount": 0, "nextMinimumBid": 1000000, "minIncrement": 50000,
+      "durationSeconds": 86400, "startsAt": "2026-10-15T10:00:00.000Z",
+      "endsAt": "2026-10-16T10:00:00.000Z", "status": "live", "finalPrice": null,
+      "highestBidderId": null, "winnerId": null, "version": 1,
+      "createdAt": "2026-10-15T09:00:00.000Z", "updatedAt": "2026-10-15T10:00:00.000Z",
+      "seller": { "id": 41, "username": "Rina" }, "highestBidder": null, "winner": null
+    }
+  ],
+  "meta": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 }
+}
+```
+
+`data` is an array of auction objects. `meta` provides integer `page`, `limit`, `total`, and `totalPages` values. Public user summaries omit email and credentials.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid pagination, filters, or unknown query parameters; HTTP 401 `UNAUTHORIZED`; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** An empty result is HTTP 200 with an empty `data` array and zero totals.
+
+#### Get auction details
+
+**Method:** GET\
+**Path:** `/auctions/:id`\
+**Purpose:** Return an auction's current serialized state and server timestamp.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** None.\
+**Request body:** No request body is required.
+
+**Example request:**
+
+```bash
+curl "http://localhost:3000/auctions/8" -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200; `data.auction` has the auction fields described above, and `serverNow` is the server's ISO 8601 UTC time.
+
+```json
+{
+  "message": "Auction retrieved successfully.",
+  "data": {
+    "auction": { "id": 8, "sellerId": 41, "title": "Sony Alpha camera", "description": "Mirrorless camera in good working condition.", "condition": "used_good", "category": "camera", "productFacts": { "specifications": "24 MP sensor", "defects": null, "accessories": [], "warranty": null }, "imageUrl": null, "startingPrice": 1000000, "currentPrice": 1100000, "bidCount": 2, "nextMinimumBid": 1150000, "minIncrement": 50000, "durationSeconds": 86400, "startsAt": "2026-10-15T10:00:00.000Z", "endsAt": "2026-10-16T10:00:00.000Z", "status": "live", "finalPrice": null, "highestBidderId": 52, "winnerId": null, "version": 3, "createdAt": "2026-10-15T09:00:00.000Z", "updatedAt": "2026-10-15T10:05:00.000Z", "seller": { "id": 41, "username": "Rina" }, "highestBidder": { "id": 52, "username": "Dimas" }, "winner": null },
+    "serverNow": "2026-10-15T10:05:01.000Z"
+  }
+}
+```
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for a non-positive or invalid ID; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` if absent or if it is another user's private draft; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** Auction state and timestamps come from the backend. The endpoint does not include bid-history rows; use the bid-history endpoint for those.
+
+### Auction Draft Management
+
+Auction create and update bodies accept only the fields in the table below. The same validations apply to an update when a field is supplied; updates are partial. Unknown fields and server-controlled lifecycle fields are rejected.
+
+| Field | Type | Required on create | Validation |
+|---|---|---:|---|
+| `title` | string | Yes | Trimmed; 3–120 characters. |
+| `description` | string | Yes | Trimmed; 10–3000 characters. |
+| `condition` | string | Yes | `new`, `used_good`, or `used_fair`. |
+| `category` | string | Yes | `smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, or `accessories`. |
+| `productFacts` | object | No | Only `specifications`, `defects`, `accessories`, and `warranty`. Text fields are string or `null` (maxima: 2000, 1000, and 500 characters); `accessories` is at most 10 strings of at most 100 characters each. Omitted facts default to null text fields and an empty accessories array. |
+| `imageUrl` | string or null | No | Valid HTTPS URL, maximum 2048 characters; omitted or null becomes null. |
+| `startingPrice` | integer | Yes | Rupiah amount from 1 through 2,000,000,000. |
+| `minIncrement` | integer | Yes | Rupiah amount from 1 through 2,000,000,000; starting price plus increment may not exceed 2,000,000,000. |
+| `durationSeconds` | integer | Yes | 60 through 604,800 seconds. |
+
+Clients may not set `sellerId`, `currentPrice`, `status`, `startsAt`, `endsAt`, `highestBidderId`, `winnerId`, or `version`.
+
+#### Create auction draft
+
+**Method:** POST\
+**Path:** `/auctions`\
+**Purpose:** Create a seller-owned draft.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>` and `Content-Type: application/json`.
+
+**Path parameters:** None.\
+**Query parameters:** None.
+
+**Request body:** JSON object containing all fields marked required in the draft field table. Optional `imageUrl` may be omitted or null. Unknown and protected fields are rejected.
+
+**Example request:**
+
+```bash
+curl -X POST "http://localhost:3000/auctions" \
+  -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" \
+  -d '{"title":"Sony Alpha camera","description":"Mirrorless camera in good working condition.","condition":"used_good","category":"camera","productFacts":{"specifications":"24 MP sensor","defects":null,"accessories":["Body cap"],"warranty":null},"imageUrl":"https://example.test/camera.jpg","startingPrice":1000000,"minIncrement":50000,"durationSeconds":86400}'
+```
+
+**Success response:** HTTP 201.
+
+```json
+{
+  "message": "Auction draft created successfully.",
+  "data": { "auction": { "id": 8, "sellerId": 41, "title": "Sony Alpha camera", "description": "Mirrorless camera in good working condition.", "condition": "used_good", "category": "camera", "productFacts": { "specifications": "24 MP sensor", "defects": null, "accessories": ["Body cap"], "warranty": null }, "imageUrl": "https://example.test/camera.jpg", "startingPrice": 1000000, "currentPrice": 1000000, "bidCount": null, "nextMinimumBid": null, "minIncrement": 50000, "durationSeconds": 86400, "startsAt": null, "endsAt": null, "status": "draft", "finalPrice": null, "highestBidderId": null, "winnerId": null, "version": 0, "createdAt": "2026-10-15T09:00:00.000Z", "updatedAt": "2026-10-15T09:00:00.000Z", "seller": { "id": 41, "username": "Rina" }, "highestBidder": null, "winner": null } }
+}
+```
+
+The auction has `status: "draft"`, `currentPrice` equal to `startingPrice`, `version: 0`, null `startsAt`/`endsAt`, and the authenticated user as seller.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid, missing, unknown, or protected fields, or if starting price plus increment exceeds the monetary maximum; HTTP 401 `UNAUTHORIZED`; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** The seller ID is taken from the JWT, not the body. Creation does not start the auction.
+
+#### Update auction draft
+
+**Method:** PATCH\
+**Path:** `/auctions/:id`\
+**Purpose:** Partially edit an owned draft.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>` and `Content-Type: application/json`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** None.
+
+**Request body:** A nonempty JSON object with one or more allowed draft fields from the create-auction field table. Supplied values use the same validation rules; omitted values are preserved. Protected and unknown fields are rejected.
+
+**Example request:**
+
+```bash
+curl -X PATCH "http://localhost:3000/auctions/8" \
+  -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" \
+  -d '{"title":"Sony Alpha camera with body cap"}'
+```
+
+**Success response:** HTTP 200.
+
+```json
+{
+  "message": "Auction draft updated successfully.",
+  "data": { "auction": { "id": 8, "sellerId": 41, "title": "Sony Alpha camera with body cap", "description": "Mirrorless camera in good working condition.", "condition": "used_good", "category": "camera", "productFacts": { "specifications": "24 MP sensor", "defects": null, "accessories": ["Body cap"], "warranty": null }, "imageUrl": "https://example.test/camera.jpg", "startingPrice": 1000000, "currentPrice": 1000000, "bidCount": null, "nextMinimumBid": null, "minIncrement": 50000, "durationSeconds": 86400, "startsAt": null, "endsAt": null, "status": "draft", "finalPrice": null, "highestBidderId": null, "winnerId": null, "version": 0, "createdAt": "2026-10-15T09:00:00.000Z", "updatedAt": "2026-10-15T09:10:00.000Z", "seller": { "id": 41, "username": "Rina" }, "highestBidder": null, "winner": null } }
+}
+```
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR`; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or one not owned by the caller; HTTP 409 `AUCTION_NOT_DRAFT` if the owned auction is live or ended; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** Ownership and draft status are checked in the backend within the update transaction.
+
+#### Delete auction draft
+
+**Method:** DELETE\
+**Path:** `/auctions/:id`\
+**Purpose:** Delete an owned draft.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** None.\
+**Request body:** No request body is required.
+
+**Example request:**
+
+```bash
+curl -X DELETE "http://localhost:3000/auctions/8" -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200.
+
+```json
+{ "message": "Auction draft deleted successfully.", "data": { "id": 8 } }
+```
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for an invalid ID; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or one not owned by the caller; HTTP 409 `AUCTION_NOT_DRAFT` if the auction is live or ended; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** Only the auction draft is deleted. The endpoint does not delete live or ended auctions.
+
+### Auction Lifecycle
+
+#### Start auction
+
+**Method:** POST\
+**Path:** `/auctions/:id/start`\
+**Purpose:** Transition an owned draft to live.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`. `Content-Type: application/json` may be sent when using the optional empty object body.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** None.
+
+**Request body:** No body is required; an empty JSON object is accepted. Nonempty bodies are rejected because lifecycle fields are server-controlled.
+
+**Example request:**
+
+```bash
+curl -X POST "http://localhost:3000/auctions/8/start" -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200, `{ "message": "Auction started successfully.", "data": { "auction": <auction> } }`.
+
+```json
+{
+  "message": "Auction started successfully.",
+  "data": { "auction": { "id": 8, "sellerId": 41, "title": "Sony Alpha camera", "description": "Mirrorless camera in good working condition.", "condition": "used_good", "category": "camera", "productFacts": { "specifications": "24 MP sensor", "defects": null, "accessories": [], "warranty": null }, "imageUrl": null, "startingPrice": 1000000, "currentPrice": 1000000, "bidCount": 0, "nextMinimumBid": 1000000, "minIncrement": 50000, "durationSeconds": 86400, "startsAt": "2026-10-15T10:00:00.000Z", "endsAt": "2026-10-16T10:00:00.000Z", "status": "live", "finalPrice": null, "highestBidderId": null, "winnerId": null, "version": 1, "createdAt": "2026-10-15T09:00:00.000Z", "updatedAt": "2026-10-15T10:00:00.000Z", "seller": { "id": 41, "username": "Rina" }, "highestBidder": null, "winner": null } }
+}
+```
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for an invalid ID or nonempty body; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or one not owned by the caller; HTTP 409 `AUCTION_NOT_DRAFT` for a repeated start or non-draft auction; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** The server sets `startsAt` and computes `endsAt` from `durationSeconds`, sets status to live, and increments `version` in a transaction. Starting also publishes `auction:started` and triggers Auctioneer commentary after the state change; realtime delivery and AI failure do not undo the start.
+
+### Bidding and Bid History
+
+#### Submit bid
+
+**Method:** POST\
+**Path:** `/auctions/:id/bids`\
+**Purpose:** Submit an authenticated bid on a live auction.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>` and `Content-Type: application/json`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** None.
+
+**Request body:** JSON object with exactly these fields; unknown or server-controlled fields are rejected.
+
+| Field | Type | Required | Validation |
+|---|---|---:|---|
+| `amount` | integer | Yes | Rupiah amount from 1 through 2,000,000,000; must meet the current minimum bid. |
+| `clientRequestId` | UUID string | Yes | Identifies this caller's request for idempotent retry. |
+
+**Example request:**
+
+```bash
+curl -X POST "http://localhost:3000/auctions/8/bids" \
+  -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" \
+  -d '{"amount":1000000,"clientRequestId":"8c26b81b-aea6-4fe7-a183-7c9941beaf12"}'
+```
+
+**Success response:** HTTP 201 for a newly accepted bid; HTTP 200 when returning the result of an identical idempotent retry.
+
+```json
+{
+  "message": "Bid accepted successfully.",
+  "data": {
+    "auction": { "id": 8, "sellerId": 41, "title": "Sony Alpha camera", "description": "Mirrorless camera in good working condition.", "condition": "used_good", "category": "camera", "productFacts": { "specifications": "24 MP sensor", "defects": null, "accessories": [], "warranty": null }, "imageUrl": null, "startingPrice": 1000000, "currentPrice": 1000000, "bidCount": 1, "nextMinimumBid": 1050000, "minIncrement": 50000, "durationSeconds": 86400, "startsAt": "2026-10-15T10:00:00.000Z", "endsAt": "2026-10-16T10:00:00.000Z", "status": "live", "finalPrice": null, "highestBidderId": 52, "winnerId": null, "version": 2, "createdAt": "2026-10-15T09:00:00.000Z", "updatedAt": "2026-10-15T10:00:00.000Z", "seller": { "id": 41, "username": "Rina" }, "highestBidder": { "id": 52, "username": "Dimas" }, "winner": null },
+    "bid": { "id": 93, "auctionId": 8, "userId": 52, "amount": 1000000, "clientRequestId": "8c26b81b-aea6-4fe7-a183-7c9941beaf12", "createdAt": "2026-10-15T10:00:00.000Z", "bidder": { "id": 52, "username": "Dimas" } },
+    "clientRequestId": "8c26b81b-aea6-4fe7-a183-7c9941beaf12",
+    "replayed": false
+  }
+}
+```
+
+On replay the message is `Original bid result returned.` and `replayed` is `true`; the original bid and auction result are returned.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid ID/body; HTTP 401 `UNAUTHORIZED`; HTTP 403 `SELF_BID_FORBIDDEN` if the seller bids on their own auction; HTTP 404 `NOT_FOUND` for a missing auction; HTTP 409 `AUCTION_NOT_LIVE`, `AUCTION_ENDED`, `BID_TOO_LOW`, `BID_LIMIT_REACHED`, or `IDEMPOTENCY_CONFLICT` for the corresponding state, minimum, price ceiling, or reused request ID with different bid data; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** Acceptance and auction price/highest bidder/deadline/version updates are transactional. Repeating the same `clientRequestId` for the same user, auction, and amount does not create another bid or extend the deadline again. A newly accepted bid may extend the deadline; the response is authoritative. Accepted bids publish `bid:updated` after commit. Every third accepted bid may trigger public AI Auctioneer commentary.
+
+#### Get bid history
+
+**Method:** GET\
+**Path:** `/auctions/:id/bids`\
+**Purpose:** Return paginated bid history, newest first, with public bidder usernames.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** `page` is a positive integer defaulting to `1`; `limit` is a positive integer defaulting to `20`, maximum `50`. Unknown parameters are rejected.\
+**Request body:** No request body is required.
+
+**Example request:**
+
+```bash
+curl "http://localhost:3000/auctions/8/bids?page=1&limit=20" -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200.
+
+```json
+{
+  "message": "Bids retrieved successfully.",
+  "data": [
+    { "id": 93, "auctionId": 8, "userId": 52, "amount": 1000000, "createdAt": "2026-10-15T10:00:00.000Z", "bidder": { "id": 52, "username": "Dimas" } }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
+```
+
+Each history bid has integer IDs and amount, ISO `createdAt`, and `bidder` as `{id, username}` or `null`. The public history omits the idempotency key.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid ID, pagination, or unknown query parameters; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or another user's private draft; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** Draft history is visible only to its seller. Live and ended auction history is available to authenticated users.
+
+### Product Q&A and AI Interactions
+
+#### Ask a product question
+
+**Method:** POST\
+**Path:** `/auctions/:id/ai/questions`\
+**Purpose:** Submit a question about an auction product and persist the private AI interaction.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>` and `Content-Type: application/json`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** None.
+
+**Request body:** JSON object with exactly one field: `question` (string, required), trimmed to 3–500 characters. Unknown fields are rejected.
+
+**Example request:**
+
+```bash
+curl -X POST "http://localhost:3000/auctions/8/ai/questions" \
+  -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" \
+  -d '{"question":"What accessories are included?"}'
+```
+
+**Success response:** HTTP 202.
+
+```json
+{
+  "message": "AI interaction processed.",
+  "data": {
+    "interaction": {
+      "id": 204, "auctionId": 8, "userId": 52, "kind": "question", "visibility": "private",
+      "question": "What accessories are included?", "answer": "The listing does not specify any accessories.",
+      "missingInformation": ["accessories"], "sources": [], "status": "completed",
+      "sourceVersion": 2, "snapshotAt": "2026-10-15T10:01:00.000Z", "errorCode": null,
+      "createdAt": "2026-10-15T10:01:00.000Z", "updatedAt": "2026-10-15T10:01:02.000Z", "user": null
+    }
+  }
+}
+```
+
+The interaction includes `id`, `auctionId`, nullable `userId`, `kind`, `visibility`, `question`, nullable `answer`, arrays `missingInformation` and `sources`, `status`, `sourceVersion`, ISO `snapshotAt`/timestamps, nullable `errorCode`, and an optional public `{id, username}` user summary. Question interactions are private to their asker. Source entries, when present, contain `reference`, `title`, and validated HTTPS `url`.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR`; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or another user's private draft; HTTP 409 `AUCTION_NOT_LIVE` when questions are requested for a draft; HTTP 429 `RATE_LIMITED` when the per-user question interval applies (`details.retryAfterSeconds` is `10`); HTTP 503 `AI_UNAVAILABLE` when the provider fails; HTTP 500 `INTERNAL_ERROR` if the interaction cannot be saved or an unexpected failure occurs. Error responses retain the common `fields` and `details` objects.
+
+**Additional behavior:** Questions are available for live and ended auctions. A request is rate-limited per user; persisted private interactions are listed only to that user. The response uses HTTP 202 even though this server currently awaits the provider before responding. `ai:pending`, `ai:message`, and `ai:error` broadcasts, when connected, target the asking user's private socket room; delivery is best effort and persisted interaction history is authoritative. Groq configuration and keys remain server-side.
+
+#### List AI interactions
+
+**Method:** GET\
+**Path:** `/auctions/:id/ai/interactions`\
+**Purpose:** List the caller's private Product Q&A interactions together with public AI Auctioneer commentary.\
+**Authentication:** Required.\
+**Required headers:** `Authorization: Bearer <JWT>`.
+
+**Path parameters:** `id` — positive integer auction ID.\
+**Query parameters:** `page` is a positive integer defaulting to `1`; `limit` is a positive integer defaulting to `10`, maximum `50`. Unknown parameters are rejected.\
+**Request body:** No request body is required.
+
+**Example request:**
+
+```bash
+curl "http://localhost:3000/auctions/8/ai/interactions?page=1&limit=10" \
+  -H "Authorization: Bearer <JWT>"
+```
+
+**Success response:** HTTP 200.
+
+```json
+{
+  "message": "AI interactions retrieved successfully.",
+  "data": [
+    { "id": 204, "auctionId": 8, "userId": 52, "kind": "question", "visibility": "private", "question": "What accessories are included?", "answer": "The listing does not specify any accessories.", "missingInformation": ["accessories"], "sources": [], "status": "completed", "sourceVersion": 2, "snapshotAt": "2026-10-15T10:01:00.000Z", "errorCode": null, "createdAt": "2026-10-15T10:01:00.000Z", "updatedAt": "2026-10-15T10:01:02.000Z", "user": { "id": 52, "username": "Dimas" } }
+  ],
+  "meta": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 }
+}
+```
+
+`data` contains serialized interactions and `meta` contains pagination totals. Private question rows are scoped to the authenticated user; public commentary can be included for all authorized viewers.
+
+**Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid ID, pagination, or unknown query parameters; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or another user's private draft; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
+
+**Additional behavior:** The list is newest first. There is no implemented REST endpoint for fetching one interaction by its ID; interaction detail is available through this collection response.
+
+## Socket.IO Reference
+
+Socket.IO connects to the backend origin (local default `http://localhost:3000`; production target `https://smart-hammer-server.ilham.bond`) on the default `/socket.io` path. The frontend uses `VITE_SOCKET_URL`, then `VITE_API_BASE_URL`, then the local default. Authenticate with the same JWT as REST, passed directly without the `Bearer ` prefix:
+
+```js
+const socket = io('http://localhost:3000', { auth: { token: accessToken } });
+```
+
+Missing, invalid, or expired JWTs are rejected. On connect, the server joins the authenticated socket to `user:<userId>`. Clients join and leave auction rooms using only `{ "auctionId": 8 }`:
+
+```js
+socket.emit('auction:join', { auctionId: 8 }, (ack) => console.log(ack));
+socket.emit('auction:leave', { auctionId: 8 }, (ack) => console.log(ack));
+```
+
+Acknowledgements are `{ "ok": true, "data": { "auctionId": 8 } }` or `{ "ok": false, "error": { "code": "...", "message": "..." } }`. Joining validates auction access and sends `auction:snapshot` to that socket. Snapshot payloads use `{ "auctionId", "version", "serverNow", "data" }`; `data` contains the shared serialized `auction`, the 20 newest `bids` (with safe `{id, username}` bidder summaries), up to 20 public `aiInteractions`, and `bidsMeta` and `aiMeta` pagination objects.
+
+The server emits these auction events. State-change events are broadcast to `auction:<auctionId>`; the snapshot is sent only to the socket that joined:
+
+| Event | Payload data |
+|---|---|
+| `auction:snapshot` | `auction`, recent `bids`, public `aiInteractions`, and their pagination metadata. |
+| `auction:started` | `auction` with persisted start/deadline state. |
+| `bid:updated` | `auction`, accepted public `bid`, and `bidCount`. |
+| `auction:ended` | `auction`, `winner`, `finalPrice`, and `bidCount`. |
+
+Each event includes `auctionId`, persisted `version`, and ISO UTC `serverNow` around its `data`. State-change events follow successful database commits. Public bid payloads omit email, credentials, and `clientRequestId`.
+
+AI events use `{ "auctionId", "version", "serverNow", "data": { "interaction", "message?" } }`, with `version` taken from the interaction's captured source version:
+
+- Private Product Q&A `ai:pending`, `ai:message`, and `ai:error` events go to the asker's `user:<userId>` room only.
+- Public AI Auctioneer commentary uses those same event names in `auction:<auctionId>`; only public `commentary` interactions are published there.
+- `ai:message` follows persisted completion. `ai:error` follows persisted failure when persistence succeeds. Delivery is best effort; REST history is authoritative.
+
+After reconnecting, the client reauthenticates, rejoins the desired room, and receives a fresh snapshot. Socket.IO does not replay missed events. The frontend compares auction versions and can load a REST snapshot if it detects a gap. See [the detailed REST and Socket.IO contracts](docs/API.md#socketio) for the full snapshot example and additional behavior.

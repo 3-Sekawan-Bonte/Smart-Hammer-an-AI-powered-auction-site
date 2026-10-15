@@ -40,6 +40,13 @@ test('the bid form reads its live Redux auction and never submits the visual pla
   assert.match(form, /if \(inFlight\.current/);
 });
 
+test('bid history renders the associated public username and truncates long names responsively', async () => {
+  const history = await readSource('../src/components/BidHistory.jsx');
+  const css = await readSource('../src/index.css');
+  assert.match(history, /bid\.bidder\?\.username\s*\|\|\s*'Peserta'/);
+  assert.match(css, /\.bid-person strong, \.bid-person span \{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis/s);
+});
+
 test('auction detail prices preserve every digit and use container-responsive sizing', async () => {
   for (const value of [10_000, 550_000_000, 2_000_000_000]) {
     assert.equal(formatRupiah(value).replace(/\D/g, ''), String(value));

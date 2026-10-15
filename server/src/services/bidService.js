@@ -2,7 +2,7 @@ const HttpError = require('../utils/httpError');
 
 const MAX_BID = 2_000_000_000;
 
-function serializeBid(bid) {
+function serializeBid(bid, bidder = null) {
   const value = typeof bid.toJSON === 'function' ? bid.toJSON() : bid;
   return {
     id: value.id,
@@ -11,6 +11,11 @@ function serializeBid(bid) {
     amount: value.amount,
     clientRequestId: value.clientRequestId,
     createdAt: new Date(value.createdAt).toISOString(),
+    bidder: bidder?.id != null && typeof bidder.username === 'string'
+      ? { id: bidder.id, username: bidder.username }
+      : value.bidder?.id != null && typeof value.bidder.username === 'string'
+        ? { id: value.bidder.id, username: value.bidder.username }
+        : null,
   };
 }
 
@@ -36,9 +41,10 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
     return Bid.findOne({ where: { userId, clientRequestId }, transaction });
   }
 
-  function verifyReplay(existing, auctionId, amount) {
+  async function verifyReplay(existing, auctionId, amount, transaction) {
     if (existing.auctionId !== auctionId || existing.amount !== amount) throw idempotencyConflict();
-    return { bid: serializeBid(existing), replayed: true };
+    const bidder = User ? await User.findByPk(existing.userId, { attributes: ['id', 'username'], transaction }) : null;
+    return { bid: serializeBid(existing, bidder), replayed: true };
   }
 
   async function place(userId, auctionId, input) {
@@ -49,7 +55,7 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
 
         const existing = await findExisting(userId, input.clientRequestId, transaction);
         if (existing) {
-          const replay = verifyReplay(existing, auctionId, input.amount);
+          const replay = await verifyReplay(existing, auctionId, input.amount, transaction);
           const bidCount = await Bid.count({ where: { auctionId }, transaction });
           if (typeof auction.setDataValue === 'function') auction.setDataValue('bidCount', bidCount);
           else auction.bidCount = bidCount;
@@ -84,6 +90,7 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
           clientRequestId: input.clientRequestId,
           createdAt: acceptedBidTime,
         }, { transaction });
+        const bidder = User ? await User.findByPk(userId, { attributes: ['id', 'username'], transaction }) : null;
         await auction.update({
           currentPrice: input.amount,
           highestBidderId: userId,
@@ -98,7 +105,7 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
           : await Bid.count({ where: { auctionId }, transaction });
         if (typeof updatedAuction.setDataValue === 'function') updatedAuction.setDataValue('bidCount', bidCount);
         else updatedAuction.bidCount = bidCount;
-        return { bid: serializeBid(bid), replayed: false, auction: updatedAuction, bidCount };
+        return { bid: serializeBid(bid, bidder), replayed: false, auction: updatedAuction, bidCount };
       });
       if (!result.replayed) {
         const { clientRequestId: _privateRequestId, ...publicBid } = result.bid;
@@ -118,7 +125,7 @@ function createBidService({ Auction, Bid, User, sequelize, eventPublisher, aucti
       if (!isUniqueViolation(error)) throw error;
       const existing = await findExisting(userId, input.clientRequestId);
       if (!existing) throw error;
-      const replay = verifyReplay(existing, auctionId, input.amount);
+      const replay = await verifyReplay(existing, auctionId, input.amount);
       const auction = await Auction.findByPk(auctionId, { include: auctionIncludes });
       const bidCount = await Bid.count({ where: { auctionId } });
       if (auction && typeof auction.setDataValue === 'function') auction.setDataValue('bidCount', bidCount);
