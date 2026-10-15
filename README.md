@@ -4,6 +4,10 @@ Smart Hammer is an electronics auction application for sellers and buyers. Selle
 
 The project demonstrates a complete auction lifecycle with persistent PostgreSQL state, server-side bid validation, Socket.IO updates, AI-assisted product information, and a winner-only Midtrans Snap Sandbox checkout. Payment testing is limited to BCA Virtual Account and Mandiri Bill Payment; production payments, wallets, and delivery are not supported.
 
+Server deployed at: [https://smart-hammer-server.ilham.bond](https://smart-hammer-server.ilham.bond)
+
+Client deployed at: [https://smart-hammer.ilham.bond](https://smart-hammer.ilham.bond)
+
 ## Features
 
 - Username, email, and password registration; JWT login and session restoration.
@@ -20,6 +24,74 @@ The seller supplies listing details; those statements are not independently veri
 ## Technology
 
 React 19, Vite, Tailwind CSS 4, React Router, Redux Toolkit, React Context, Axios, Socket.IO Client, Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT, bcryptjs, Groq Chat Completions API, Jest, and Supertest.
+
+## Third-Party APIs and Services
+
+This section describes integrations confirmed in the current source. Hosting targets are documented separately below; their presence in project configuration does not verify a live deployment. The application does not use Supabase REST APIs or Supabase Auth.
+
+### • Groq API
+
+**Purpose:** Generate private Product Q&A answers and public AI Auctioneer commentary. Selected external product research questions can use Groq's built-in Browser Search tool; this is part of the Groq request, not a separate search provider.
+
+**Integration location:** `server/src/services/groqProvider.js`, called by `server/src/services/aiInteractionService.js` and `server/src/services/auctioneerService.js`.
+
+**Endpoint or connection method:** Raw HTTP `POST https://api.groq.com/openai/v1/chat/completions` using Node's `fetch`; no Groq SDK is installed. The default model is `openai/gpt-oss-120b`, overridable with `GROQ_MODEL`. Listing-grounded Q&A and Auctioneer prompts request structured JSON. When the question classifier selects external research, the request includes Groq's `browser_search` built-in tool and the response parser validates the answer and citation metadata.
+
+**Authentication:** `Authorization: Bearer <GROQ_API_KEY>` is sent by the backend only. Never put `GROQ_API_KEY` in a `VITE_*` variable, frontend source, or frontend bundle.
+
+**Environment variables:** `GROQ_API_KEY` (required for provider requests; optional for starting the server) and `GROQ_MODEL` (optional; defaults to `openai/gpt-oss-120b`).
+
+**Environment:** Groq hosted API. This repository does not configure a separate Groq sandbox environment.
+
+**Data flow:** Product Q&A sends the user question plus bounded auction/listing facts captured by the backend. Selected external product questions also request browser search; validated answer and citation metadata are persisted as a private interaction for the asking user. Auctioneer requests send persisted auction facts and lifecycle/bid context; validated commentary is stored as public auction commentary. The provider does not decide bids, prices, deadlines, auction status, or winners.
+
+**Failure handling:** Requests use an 18-second timeout for structured responses and a 45-second timeout for Browser Search. HTTP, network, timeout, malformed-response, and output-validation failures are mapped to safe internal codes. Q&A persists a failed interaction when possible and returns a generic unavailable response; Auctioneer generation is best effort and does not block auction lifecycle operations. Provider response bodies and keys are not returned to clients.
+
+**Official documentation:** [Groq API Reference](https://console.groq.com/docs/api-reference), [Chat Completions](https://console.groq.com/docs/text-chat), and [Built-in Tools](https://console.groq.com/docs/tool-use/built-in-tools).
+
+### • Midtrans Snap
+
+**Purpose:** Let the verified winner of an ended auction test payment for the persisted final auction price.
+
+**Integration location:** `server/src/services/midtransGateway.js` and `server/src/services/paymentService.js` create and verify payment transactions; `server/src/routes/paymentNotificationRoutes.js` receives notifications; `client/src/components/AuctionPayment.jsx` loads Snap.js and opens checkout.
+
+**Endpoint or connection method:** The backend uses the official `midtrans-client` Node.js SDK. In Sandbox mode it creates transactions through `https://app.sandbox.midtrans.com/snap/v1/transactions` and retrieves status through `https://api.sandbox.midtrans.com/v2/{order_id}/status`. The frontend loads `https://app.sandbox.midtrans.com/snap/snap.js` and launches checkout with the Snap token returned by the backend. The application notification endpoint is `POST /payments/midtrans/notifications`.
+
+**Authentication:** `MIDTRANS_SERVER_KEY` is used only by the backend SDK and for notification signature verification; it must never be sent to the client or included in logs. `MIDTRANS_CLIENT_KEY` is the public Sandbox key and is returned only to the authenticated winner when a pending checkout is available, for Snap.js initialization.
+
+**Environment variables:** `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, and `MIDTRANS_IS_PRODUCTION` (must be exactly `false`). `MIDTRANS_PAYMENT_EXPIRY_HOURS` is optional and defaults to 24 (accepted range 1–72).
+
+**Environment:** Sandbox only. Backend configuration rejects production mode. Production payment processing is not enabled. Only BCA Virtual Account (`bca_va`) and Mandiri Bill Payment (`echannel`) are enabled.
+
+**Data flow:** The backend verifies the caller is the persisted winner of an ended auction, then uses the saved final auction price and creates a unique IDR order. The frontend receives the Snap token and opens checkout. Browser callbacks trigger a backend status refresh; they do not establish payment success. The webhook validates Midtrans's SHA-512 signature, then the backend fetches transaction status from Midtrans and persists verified order, amount, currency, method, transaction ID, and status. Payment data is restricted to the winner.
+
+**Failure handling:** Snap requests have a 10-second HTTP timeout. Invalid signatures and mismatched order details are rejected; provider verification failures return a generic service error. Repeated notifications are safe, and a stale status does not downgrade an already verified paid record. Automated tests use mocked provider responses. Actual BCA and Mandiri Sandbox simulator transactions have not been verified in this environment.
+
+**Official documentation:** [Midtrans Node.js SDK](https://github.com/Midtrans/midtrans-nodejs-client), [Snap integration guide](https://docs.midtrans.com/docs/snap-snap-integration-guide), [HTTP(S) notifications and signature verification](https://docs.midtrans.com/docs/https-notification-webhooks), [Get transaction status](https://docs.midtrans.com/reference/get-transaction-status), and [Sandbox payment testing](https://docs.midtrans.com/docs/testing-payment-on-sandbox).
+
+### • PostgreSQL through Sequelize (Supabase deployment target)
+
+**Purpose:** Persist users, auctions, bids, AI interactions, and payments.
+
+**Integration location:** `server/src/config/database.js`, `server/config/database.js`, Sequelize models in `server/src/models/`, and migrations in `server/migrations/`.
+
+**Endpoint or connection method:** The backend uses Sequelize's PostgreSQL dialect and `pg` driver. It accepts a PostgreSQL `DATABASE_URL`, or split `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT` settings. `DATABASE_URL` takes precedence. `DB_SSL=true` enables TLS options in the backend runtime configuration. The repository does not contain a live connection string, so it does not establish whether the target Supabase connection is direct or uses a pooler; that choice belongs to the supplied URL.
+
+**Authentication:** Database credentials are supplied to the backend process through server environment variables. Never put them in frontend variables, source code, or this README.
+
+**Environment variables:** `DATABASE_URL` or the split `DB_*` values; `DB_SSL` is optional and is set to `true` for the documented Supabase deployment target. Database test suites use separate `TEST_DATABASE_URL` or `TEST_DB_*` settings.
+
+**Environment:** The deployment documentation names Supabase PostgreSQL as the target. Runtime code is generic PostgreSQL and can connect to another compatible PostgreSQL service. The repository does not prove that the Supabase project or production database is currently provisioned or reachable.
+
+**Data flow:** Sequelize authenticates to PostgreSQL and reads/writes through model queries and explicit migrations. The backend uses database transactions and row locks for bid and auction closure consistency. This is a direct PostgreSQL connection through a Node.js driver, not Supabase's REST Data API, Supabase client library, or Supabase Auth.
+
+**Failure handling:** Database connectivity is checked during backend startup; startup recovery completes before the HTTP server begins listening. Database errors are handled by backend services/middleware, with generic public errors. `DB_SSL=true` currently configures TLS with `rejectUnauthorized: false`; certificate verification should be reviewed against deployment requirements.
+
+**Official documentation:** [Supabase PostgreSQL connection options](https://supabase.com/docs/guides/database/connecting-to-postgres) and [Supabase SSL enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement).
+
+### Hosting and Infrastructure
+
+Project deployment documentation names [Vercel](https://vercel.com/docs) for the React frontend, [Google Compute Engine](https://cloud.google.com/compute/docs) for the Express/Socket.IO backend, and [Supabase PostgreSQL](https://supabase.com/docs/guides/database/connecting-to-postgres) for the database. These are documented deployment targets, not verified live services. The repository includes frontend static hosting/reverse-proxy examples, but no Vercel deployment manifest or automated GCE deployment script; it does not prove that DNS, TLS, cloud resources, or a production release are active. No Vercel, Google Cloud, or Supabase management API is called by the application.
 
 ## Architecture
 
