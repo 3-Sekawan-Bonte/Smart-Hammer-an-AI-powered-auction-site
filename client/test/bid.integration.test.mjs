@@ -136,6 +136,8 @@ test('two buyers submit real HTTP bids, receive Socket.IO updates, and Redux rec
   assert.deepEqual(eventA, eventB);
   assert.equal(Object.hasOwn(eventA, 'clientRequestId'), false);
   assert.equal(Object.hasOwn(eventA.bid, 'clientRequestId'), false);
+  assert.deepEqual(eventA.bid.bidder, { id: 1, username: 'demo.bidder' });
+  assert.deepEqual(acceptedA.bid.bidder, eventA.bid.bidder);
   await waitFor(() => selectActiveAuction(store.getState())?.version === acceptedA.auction.version, 'Redux first bid');
   assert.equal(selectActiveBids(store.getState()).length, 1);
   assert.equal(selectActiveBidsMeta(store.getState()).totalData, 1);
@@ -148,6 +150,8 @@ test('two buyers submit real HTTP bids, receive Socket.IO updates, and Redux rec
   const [secondA, secondB] = await Promise.all([secondEventA, secondEventB]);
   assert.equal(secondResponse.status, 201);
   assert.deepEqual(secondA, secondB);
+  assert.equal(typeof secondA.bid.bidder.username, 'string');
+  assert.deepEqual(acceptedB.bid.bidder, secondA.bid.bidder);
   assert.equal(acceptedB.auction.bidCount, 2);
   assert.ok(Date.parse(acceptedB.auction.endsAt) >= Date.parse(acceptedA.auction.endsAt));
   await waitFor(() => selectActiveAuction(store.getState())?.version === acceptedB.auction.version, 'Redux second bid');
@@ -206,6 +210,9 @@ test('two buyers submit real HTTP bids, receive Socket.IO updates, and Redux rec
   assert.equal(historyBody.data.length, 4);
   assert.equal(historyBody.meta.totalData, 4);
   assert.deepEqual(historyBody.data.map((bid) => bid.amount), [2_150_000, 2_100_000, 2_050_000, 2_000_000]);
+  assert.equal(historyBody.data.find((bid) => bid.amount === 2_100_000).bidder.username, 'demo.bidder');
+  assert.ok(historyBody.data.every((bid) => typeof bid.bidder.username === 'string'));
+  assert.equal(new Set(historyBody.data.map((bid) => bid.bidder.username)).size, 2);
   assert.ok(historyBody.data.every((bid) => !Object.hasOwn(bid, 'clientRequestId') && !Object.hasOwn(bid, 'email')));
 });
 

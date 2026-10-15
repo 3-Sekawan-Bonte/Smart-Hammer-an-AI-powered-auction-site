@@ -1,6 +1,6 @@
 const { createBidService } = require('../src/services/bidService');
 
-function setup(overrides = {}, eventPublisher, failCommit = false, initialBidCount = 0, auctioneer) {
+function setup(overrides = {}, eventPublisher, failCommit = false, initialBidCount = 0, auctioneer, User = null) {
   const auction = {
     id: 8,
     sellerId: 2,
@@ -29,7 +29,7 @@ function setup(overrides = {}, eventPublisher, failCommit = false, initialBidCou
     createdAt: new Date(Date.now() - (initialBidCount - index) * 1000),
   }));
   const Auction = {
-    async findByPk(_id, options) { expect(options).toMatchObject({ transaction, lock: 'UPDATE' }); return auction; },
+    async findByPk(_id, options) { expect(options.transaction).toBe(transaction); if (options.lock) expect(options.lock).toBe('UPDATE'); return auction; },
   };
   const Bid = {
     async findOne({ where }) { return bids.find((bid) => bid.userId === where.userId && bid.clientRequestId === where.clientRequestId) || null; },
@@ -42,7 +42,7 @@ function setup(overrides = {}, eventPublisher, failCommit = false, initialBidCou
     },
   };
   const sequelize = { async transaction(callback) { const result = await callback(transaction); this.committed = true; if (eventPublisher) eventPublisher.committed = true; if (failCommit) throw new Error('commit failed'); return result; } };
-  return { service: createBidService({ Auction, Bid, sequelize, eventPublisher, auctioneer }), auction, bids, sequelize };
+  return { service: createBidService({ Auction, Bid, User, sequelize, eventPublisher, auctioneer }), auction, bids, sequelize };
 }
 
 const input = { amount: 1_000, clientRequestId: '550e8400-e29b-41d4-a716-446655440000' };
@@ -55,6 +55,28 @@ describe('bid service state rules', () => {
     expect(bids).toHaveLength(1);
     expect(auction).toMatchObject({ currentPrice: input.amount, highestBidderId: 4, version: 2 });
     expect(auction.endsAt.getTime()).toBeGreaterThanOrEqual(new Date(result.bid.createdAt).getTime() + 3_600_000);
+  });
+
+  test('includes only the persisted bidder public identity in REST and socket bid data', async () => {
+    const bidder = { id: 4, username: 'buyer.four', email: 'private@example.test', password: 'private-hash' };
+    const User = { findByPk: jest.fn(async (_id, options) => {
+      expect(options.attributes).toEqual(['id', 'username']);
+      return bidder;
+    }) };
+    const publisher = { committed: false, publish: jest.fn(function publish(_event, _auction, eventData) {
+      expect(this.committed).toBe(true);
+      expect(eventData.bid.bidder).toEqual({ id: 4, username: 'buyer.four' });
+      expect(JSON.stringify(eventData)).not.toContain('private@example.test');
+      expect(JSON.stringify(eventData)).not.toContain('private-hash');
+    }) };
+    const { service, auction } = setup({}, publisher, false, 0, null, User);
+    const result = await service.place(4, auction.id, input);
+    expect(result.bid.bidder).toEqual({ id: 4, username: 'buyer.four' });
+    expect(JSON.stringify(result.bid)).not.toContain('private@example.test');
+    expect(JSON.stringify(result.bid)).not.toContain('private-hash');
+    expect(publisher.publish).toHaveBeenCalledWith('bid:updated', auction, expect.objectContaining({
+      bid: expect.objectContaining({ bidder: { id: 4, username: 'buyer.four' } }),
+    }));
   });
 
   test('returns the existing accepted bid on replay before evaluating the current auction state', async () => {
