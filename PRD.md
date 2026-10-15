@@ -118,6 +118,14 @@ Jika `newEndsAt` lebih besar daripada `currentEndsAt`, deadline diperbarui. Semu
 - Komentar diproses di luar transaksi bid dan tidak boleh menunda proses bidding/penutupan.
 - Respons yang memakai state lama harus ditandai berdasarkan snapshot atau tidak ditampilkan sebagai state terkini.
 
+### FR-09 — Pembayaran pemenang (Sandbox)
+- Hanya pemenang terverifikasi dari lelang berstatus `ended` yang dapat memulai atau melihat pembayaran lelang tersebut.
+- Backend membuat transaksi Midtrans Snap menggunakan harga akhir tersimpan dan hanya mengaktifkan BCA Virtual Account serta Mandiri Bill Payment.
+- Konfirmasi checkout browser bukan bukti pembayaran. Backend memverifikasi notifikasi bertanda tangan dan status transaksi melalui API Midtrans sebelum menyimpan status `paid`.
+- Status pembayaran dan token checkout tidak boleh dilihat user lain; status pembayaran tidak mengubah hasil lelang.
+- Integrasi harus selalu memakai Midtrans Sandbox. Mode produksi ditolak; tidak ada charge uang nyata, delivery, atau wallet.
+- Kegagalan penyedia pembayaran tidak boleh mengubah harga, bid, winner, atau status lelang.
+
 ## 5. Halaman utama
 
 | Route | Tujuan | Isi utama |
@@ -160,4 +168,4 @@ Format tampilan harga: `Rp 1.500.000` (locale Indonesia dengan pemisah titik). B
 
 ## 8. Di luar scope
 
-AI summary, notifikasi tersimpan, presence, pencarian/filter lanjutan, dashboard riwayat, upload gambar, watchlist, grafik bid, AI Bid Coach, price advisor umum, fraud flags, private chat, voice, payment/wallet, auto-bid, Redis dan multi-server ditunda sampai alur inti stabil. Product Q&A boleh menjawab pertanyaan produk spesifik dengan harga ritel web yang disumberkan; ini bukan rekomendasi harga lelang.
+AI summary, notifikasi tersimpan, presence, pencarian/filter lanjutan, dashboard riwayat, upload gambar, watchlist, grafik bid, AI Bid Coach, price advisor umum, fraud flags, private chat, voice, pembayaran produksi/wallet, auto-bid, Redis dan multi-server ditunda sampai alur inti stabil. Pembayaran Midtrans Sandbox hanya untuk uji alur pemenang; bukan pembayaran produksi. Product Q&A boleh menjawab pertanyaan produk spesifik dengan harga ritel web yang disumberkan; ini bukan rekomendasi harga lelang.

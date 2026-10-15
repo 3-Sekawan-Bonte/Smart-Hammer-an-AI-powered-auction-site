@@ -26,7 +26,7 @@ cd ../client
 cp .env.example .env
 ```
 
-In `server/.env`, set a local PostgreSQL database and role, a private random `JWT_SECRET`, and (optionally) `GROQ_API_KEY`. Do not use production credentials. The example server listens on port 3000; PostgreSQL defaults to port 5432. In `client/.env`, keep the API and socket URLs pointed at `http://localhost:3000`.
+In `server/.env`, set a local PostgreSQL database and role, a private random `JWT_SECRET`, and (optionally) `GROQ_API_KEY`. To test winner checkout, set the Midtrans Sandbox server/client keys and `MIDTRANS_IS_PRODUCTION=false`; leave payment credentials empty if you do not need checkout. Never use production payment credentials. Do not use production database credentials. The example server listens on port 3000; PostgreSQL defaults to port 5432. In `client/.env`, keep the API and socket URLs pointed at `http://localhost:3000`.
 
 The backend loads `server/.env` when `NODE_ENV` is not `production`. Production configuration must be supplied by the hosting environment. Vite reads `client/.env` when starting or building the frontend; restart Vite after changing it.
 
@@ -38,6 +38,8 @@ From `server/`, confirm `.env` points only to your local development database, t
 npx sequelize-cli db:create --env development
 npx sequelize-cli db:migrate --env development
 ```
+
+The migration creates the `Payments` table for winner-only Sandbox payment attempts. It does not contact Midtrans or create transactions. Do not reset the database to apply it.
 
 Migrations create the schema. They do not require a reset or table truncation. The server does not automatically migrate or seed at startup.
 

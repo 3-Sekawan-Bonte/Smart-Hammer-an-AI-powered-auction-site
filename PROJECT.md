@@ -6,7 +6,7 @@ Smart Hammer adalah aplikasi simulasi lelang barang elektronik. Seller membuat d
 
 AI memiliki dua fungsi utama: **Product Q&A** untuk menjawab berdasarkan fakta tersimpan dan, bila pertanyaan membutuhkannya, informasi eksternal dari Groq Browser Search dengan sumber yang ditautkan; serta **AI Auctioneer** untuk komentar publik pada momen penting lelang. Q&A privat per user, sedangkan komentar Auctioneer publik. AI hanya menjadi pemandu informasi; backend tetap menentukan bid yang valid, harga, waktu penutupan, dan pemenang.
 
-Aplikasi ini menggunakan nominal simulasi. MVP tidak memproses uang nyata, pembayaran, pengiriman, atau wallet.
+Aplikasi ini menggunakan nominal simulasi. Pemenang dapat menjalankan pembayaran uji Midtrans Snap Sandbox untuk BCA Virtual Account atau Mandiri Bill Payment. Aplikasi tidak memproses pembayaran produksi, pengiriman, atau wallet.
 
 ## 2. Tujuan
 
@@ -62,12 +62,13 @@ Seller tidak boleh menawar lelangnya sendiri. Dashboard admin terpisah tidak ter
 8. Product Q&A privat yang menyimpan status, jawaban, dan sumber web terverifikasi bila pencarian digunakan.
 9. AI Auctioneer untuk pembukaan, milestone bid, dan akhir lelang.
 10. Pemulihan state sesudah refresh/reconnect serta handling kegagalan AI.
+11. Pembayaran uji Sandbox untuk pemenang melalui Midtrans Snap; integrasi produksi tidak termasuk.
 
 Kategori produk dipilih seller dari daftar subkategori elektronik: `smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`. Gambar produk menggunakan URL HTTPS pada MVP.
 
 ## 6. Bukan bagian MVP
 
-- Pembayaran, pengiriman, wallet, atau transaksi uang nyata.
+- Pembayaran produksi, pengiriman, wallet, atau transaksi uang nyata. Pembayaran Midtrans Snap Sandbox hanya untuk pengujian.
 - Auto-bid, price advisor, fraud detection, private chat, voice Q&A.
 - Redis atau arsitektur multi-server.
 - Upload file gambar; URL gambar manual tetap digunakan.
