@@ -231,11 +231,26 @@ Checklist ini adalah rencana implementasi, bukan klaim bahwa fitur sudah selesai
 - [ ] Watchlist.
 - [ ] Grafik bid.
 
+## Phase 11 — Midtrans Snap Sandbox untuk pembayaran pemenang
+
+- [x] Tambahkan model/migrasi pembayaran dengan batasan order, status, dan satu pembayaran aktif/paid per lelang.
+- [x] Tambahkan checkout yang hanya dapat dipakai winner terverifikasi; nominal berasal dari harga akhir tersimpan.
+- [x] Integrasikan SDK Midtrans Sandbox dengan BCA Virtual Account dan Mandiri Bill Payment saja; mode produksi ditolak.
+- [x] Verifikasi webhook bertanda tangan dan status transaksi server-side; callback browser tidak menetapkan status paid.
+- [x] Tambahkan UI checkout/status hanya pada banner winner dan contoh konfigurasi Sandbox.
+- [x] Tambahkan unit dan route tests untuk winner authorization, amount, idempotent checkout retry, signature, verified status, provider failure, dan rejection atas nominal dari client; kedua payment suites lulus.
+- [ ] Jalankan migrasi pembayaran pada dedicated test database dan verifikasi constraints dengan PostgreSQL.
+- [ ] Jalankan test suite backend lengkap setelah database test tersedia.
+- [ ] Selesaikan alur simulator Sandbox BCA VA dan Mandiri Bill Payment memakai kredensial akun developer.
+- [ ] Verifikasi notifikasi Sandbox yang masuk ke endpoint publik HTTPS dan status paid tersimpan setelah API status verification.
+
+**Checkpoint:** implementasi dan flow mock diuji; integrasi PostgreSQL dan simulator nyata masih menunggu kredensial Sandbox serta endpoint webhook yang dapat dijangkau.
+
 ### Tidak direncanakan untuk MVP
 - [ ] AI Price Advisor.
 - [ ] Fraud/risk flags dan admin tools.
 - [ ] Private chat.
 - [ ] Voice Q&A.
-- [ ] Payment, delivery, atau wallet.
+- [ ] Pembayaran produksi, delivery, atau wallet.
 - [ ] Auto-bid.
 - [ ] Redis/multi-server.

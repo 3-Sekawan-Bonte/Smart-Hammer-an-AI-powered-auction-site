@@ -2,7 +2,7 @@
 
 Smart Hammer is an electronics auction application for sellers and buyers. Sellers create and start listings; authenticated buyers place rupiah bids and follow the auction in real time. Product Q&A uses stored listing facts and, for selected external questions, Groq Browser Search. AI Auctioneer commentary accompanies important auction events.
 
-The project demonstrates a complete auction lifecycle with persistent PostgreSQL state, server-side bid validation, Socket.IO updates, and AI-assisted product information. It uses simulated amounts only: there are no real payments, wallets, delivery workflows, or Midtrans integration.
+The project demonstrates a complete auction lifecycle with persistent PostgreSQL state, server-side bid validation, Socket.IO updates, AI-assisted product information, and a winner-only Midtrans Snap Sandbox checkout. Payment testing is limited to BCA Virtual Account and Mandiri Bill Payment; production payments, wallets, and delivery are not supported.
 
 ## Features
 
@@ -12,6 +12,7 @@ The project demonstrates a complete auction lifecycle with persistent PostgreSQL
 - Auction countdown, automatic backend closure, winner/no-bid result, and recovery after server restart.
 - Private Product Q&A per signed-in user, with saved answers and validated source links when Groq Browser Search is selected; AI uses Groq GPT-OSS 120B by default.
 - Public AI Auctioneer commentary at auction start, every third accepted bid, and auction end.
+- Winner-only Midtrans Snap Sandbox payment initiation and server-verified payment status for BCA Virtual Account and Mandiri Bill Payment.
 - Light and dark theme preference managed with React Context.
 
 The seller supplies listing details; those statements are not independently verified. PostgreSQL and the backend decide whether a bid is accepted, the current price, auction status and deadline, and the final result. AI output is informational and cannot modify auction state.
@@ -58,7 +59,7 @@ The configured target is the frontend at [smart-hammer.ilham.bond](https://smart
 
 ## Limitations and planned work
 
-Smart Hammer is a simulated auction: it does not charge users or process payment, shipping, or wallets. Product condition and seller claims are not independently verified; external AI research does not authenticate the item being auctioned. Production deployment, two-account browser verification against the live backend, and several responsive/browser checks remain tracked in `TASKS.md`. Midtrans, upload-based images, auto-bidding, watchlists, and multi-server scaling are not implemented.
+Smart Hammer's auction values are simulated. Midtrans integration is Sandbox-only and must not be switched to production; it supports payment-flow testing for BCA Virtual Account and Mandiri Bill Payment but does not provide shipping or wallets. Product condition and seller claims are not independently verified; external AI research does not authenticate the item being auctioned. Production payment integration, production deployment, two-account browser verification against the live backend, and several responsive/browser checks remain tracked in `TASKS.md`. Upload-based images, auto-bidding, watchlists, and multi-server scaling are not implemented.
 
 ## REST API Reference
 
@@ -598,6 +599,20 @@ curl "http://localhost:3000/auctions/8/ai/interactions?page=1&limit=10" \
 **Error responses:** HTTP 400 `VALIDATION_ERROR` for invalid ID, pagination, or unknown query parameters; HTTP 401 `UNAUTHORIZED`; HTTP 404 `NOT_FOUND` for a missing auction or another user's private draft; HTTP 500 `INTERNAL_ERROR` for unexpected failures.
 
 **Additional behavior:** The list is newest first. There is no implemented REST endpoint for fetching one interaction by its ID; interaction detail is available through this collection response.
+
+### Winner payments — Midtrans Sandbox
+
+Payment endpoints are Sandbox-only. `POST /auctions/:id/payments` and `GET /auctions/:id/payments` require a JWT and are available only to the verified winner of an ended auction. The create request has no body fields; the backend derives amount from the persisted final auction price and winning bid. New checkout returns HTTP 201; a reused pending or paid record returns HTTP 200. Pending checkout includes `snapToken`, `redirectUrl`, and the public `clientKey`; the server key is never returned. Enabled methods are BCA Virtual Account (`bca_va`) and Mandiri Bill Payment (`echannel`).
+
+```bash
+curl -X POST "http://localhost:3000/auctions/8/payments" \
+  -H "Authorization: Bearer <WINNER_JWT>" -H "Content-Type: application/json" -d '{}'
+
+curl "http://localhost:3000/auctions/8/payments" \
+  -H "Authorization: Bearer <WINNER_JWT>"
+```
+
+The public `POST /payments/midtrans/notifications` endpoint accepts provider notifications without a user JWT, but verifies the Sandbox signature and fetches the transaction status from Midtrans before persisting any status. Browser checkout callbacks only refresh status. Non-winners receive 404 `NOT_FOUND`; invalid bodies/IDs return 400 `VALIDATION_ERROR`; unsafe/missing payment configuration and provider errors return generic 503 responses. Configure `MIDTRANS_IS_PRODUCTION=false`, `MIDTRANS_SERVER_KEY`, and `MIDTRANS_CLIENT_KEY` only with Sandbox credentials. See [API Reference](docs/API.md) and [Environment reference](docs/ENVIRONMENT.md) for details.
 
 ## Socket.IO Reference
 

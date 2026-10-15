@@ -1,6 +1,6 @@
 # User guide
 
-Smart Hammer is a simulated electronics auction. It does not charge a payment method or arrange delivery. The listing is supplied by its seller; auction state comes from the backend; AI-generated information is a separate informational aid.
+Smart Hammer is a simulated electronics auction. A verified winner can test checkout through Midtrans Sandbox using BCA Virtual Account or Mandiri Bill Payment. This does not process production payments or arrange delivery. The listing is supplied by its seller; auction state comes from the backend; AI-generated information is a separate informational aid.
 
 ## Create an account and sign in
 
@@ -37,6 +37,10 @@ The UI retains a request ID when retrying an uncertain bid submission. Repeating
 Ask a product question in the AI panel on a live or ended auction. Your question, answer, and any validated source links are private to your account. A rate limit initially allows one question every ten seconds. Questions about facts absent from the listing may be answered with a notice that the seller must confirm them. Some external product research uses Groq Browser Search; citations come from validated provider metadata. External product information does not establish the actual item's condition, authenticity, or included accessories.
 
 AI Auctioneer commentary is public to auction participants and can appear when an auction starts, after every third accepted bid, and when it ends. It uses a saved auction snapshot and does not set prices, accept bids, close auctions, or select winners.
+
+## Winner payment (Sandbox)
+
+After an auction ends with you as its verified winner, the result panel offers **Bayar dengan Midtrans Sandbox**. The checkout is restricted to BCA Virtual Account and Mandiri Bill Payment. Complete the flow with Midtrans Sandbox simulator instructions; browser checkout callbacks do not determine the final status. Use **Perbarui status** to ask the backend to verify the current status. Sandbox transactions do not charge real money. Payment is not available to sellers, other participants, or auctions without a winning bid.
 
 ## Theme
 
