@@ -14,6 +14,7 @@
 
 - Frontend: JavaScript, React, Vite, Tailwind CSS v4, React Router, Redux Toolkit (`@reduxjs/toolkit`), React Redux (`react-redux`), Axios, Socket.IO Client.
 - Backend: Node.js, Express, Socket.IO, Sequelize, PostgreSQL, JWT (expiry 7 hari), bcryptjs, Groq Chat Completions API (`openai/gpt-oss-120b`) via raw HTTP call (tanpa SDK).
+- Payments: Midtrans Snap Node.js client in Sandbox mode only; checkout is available to the verified auction winner for BCA Virtual Account (`bca_va`) and Mandiri Bill Payment (`echannel`). Production mode is rejected.
 - Testing backend: Jest dan Supertest.
 - Kategori lelang: seller memilih dari daftar tetap subkategori elektronik (`smartphone`, `laptop`, `pc`, `camera`, `tablet`, `monitor`, `audio`, `gaming_console`, `accessories`); backend memvalidasi nilai.
 - Uang: integer rupiah. Batas MVP yang ditetapkan pada kontrak awal adalah Rp1–Rp2.000.000.000 untuk nominal dan hasil penjumlahannya.
@@ -164,6 +165,26 @@ User ↔ Auction melalui bidding secara konseptual many-to-many, tetapi implemen
 
 Tidak perlu model `Product` terpisah pada MVP: tiap Auction menyimpan informasi satu produk/listing. Tambahkan `Products` hanya jika kelak butuh katalog reusable lintas-auction.
 
+### 5.6 `Payments`
+
+| Kolom | Aturan |
+|---|---|
+| `id` | Primary key |
+| `auctionId` | FK ke `Auctions.id`; record pembayaran tidak menghapus auction |
+| `userId` | FK ke `Users.id`; harus pemenang terverifikasi |
+| `orderId` | ID order unik yang dibuat server |
+| `amount` | Integer rupiah dari harga akhir tersimpan; 1–2.000.000.000 |
+| `currency` | `IDR` |
+| `paymentMethod` | Nullable hingga status provider diverifikasi; hanya `bca_va` atau `echannel` |
+| `transactionId` | ID provider nullable dan unik |
+| `snapToken`, `redirectUrl` | Data checkout; token hanya dikirim ke pemenang selama status `pending` |
+| `status` | `creating`, `pending`, `paid`, `failed`, `expired`, `canceled` |
+| `midtransStatus` | Status provider yang telah diverifikasi; tidak berisi pesan rahasia |
+| `expiresAt` | Batas waktu checkout Sandbox |
+| `createdAt`, `updatedAt` | Timestamp Sequelize |
+
+Order ID dan transaction ID unik. Partial unique index membatasi satu pembayaran `paid` dan satu percobaan aktif (`creating`/`pending`) per auction. FK memakai `RESTRICT`; pembayaran tidak dihapus otomatis bersama user atau auction.
+
 ## 6. State lelang dan aturan bidding
 
 ### 6.1 Harga dan deadline
@@ -229,10 +250,15 @@ Semua endpoint memerlukan autentikasi kecuali register dan login. Body client ti
 | `GET` | `/auctions/:id/bids` | Riwayat bid dengan pagination |
 | `POST` | `/auctions/:id/ai/questions` | Membuat interaksi pertanyaan AI; respons `202` |
 | `GET` | `/auctions/:id/ai/interactions` | Riwayat Q&A milik user aktif dan AI Auctioneer publik |
+| `POST` | `/auctions/:id/payments` | Memulai atau melanjutkan checkout Sandbox pemenang |
+| `GET` | `/auctions/:id/payments` | Melihat dan menyegarkan status pembayaran pemenang |
+| `POST` | `/payments/midtrans/notifications` | Webhook Midtrans Sandbox (tanpa JWT; wajib signature valid dan status diverifikasi ke API provider) |
 
 Q&A `POST`/`GET` tetap mengembalikan interaction yang sama; `sources` adalah array kosong untuk jawaban tanpa web research dan berisi `{ reference, title, url }` untuk sumber Browser Search yang tervalidasi. Field sumber hanya diserialisasi pada pertanyaan `private` milik pemanggil. Schema sumber ditambahkan melalui migration Sequelize baru; jalankan `npx sequelize-cli db:migrate --env development` pada local development database sebelum menjalankan server.
 
 Tidak ada endpoint publik untuk menetapkan pemenang.
+
+Pembayaran hanya berlaku untuk auction `ended` dengan winner dan harga akhir dari database. `POST /auctions/:id/payments` tidak menerima nominal dari client; server mengambil harga dari auction dan bid yang tersimpan. Payment creation/provider I/O tidak berjalan di dalam transaksi penguncian auction. Webhook memverifikasi signature SHA-512, lalu meminta status order dari Midtrans sebelum mengubah state. Browser callbacks hanya memicu refresh dari server. Hanya Sandbox yang didukung; server fail-closed kecuali `MIDTRANS_IS_PRODUCTION=false` dan key Sandbox tersedia.
 
 ### Konvensi API
 
@@ -458,6 +484,10 @@ Nama file boleh disesuaikan jika repository starter sudah punya konvensi berbeda
 - `CLIENT_ORIGIN`
 - `GROQ_API_KEY` (server-side secret for Product Q&A and AI Auctioneer)
 - `GROQ_MODEL` (default `openai/gpt-oss-120b`)
+- `MIDTRANS_SERVER_KEY` (Sandbox secret; server only)
+- `MIDTRANS_CLIENT_KEY` (Sandbox public client key; returned only to the verified winner)
+- `MIDTRANS_IS_PRODUCTION` (must be exactly `false`; production mode is unsupported)
+- `MIDTRANS_PAYMENT_EXPIRY_HOURS` (optional integer 1–72; default 24)
 
 ### Frontend
 

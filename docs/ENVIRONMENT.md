@@ -30,11 +30,17 @@ Production checks require absolute HTTPS URLs (HTTPS or WSS for the socket value
 | `CLIENT_ORIGIN` | Comma-separated exact browser origins allowed by Express and Socket.IO CORS | Operationally required for production browser access; development has localhost defaults | `https://smart-hammer.ilham.bond` | No |
 | `GROQ_API_KEY` | Authenticates server HTTP requests to Groq for Q&A/commentary | Optional to start server; required for AI answers | `<Groq API key>`; server only | Yes |
 | `GROQ_MODEL` | Groq model name; defaults to `openai/gpt-oss-120b` | Optional | `openai/gpt-oss-120b`; server only | No |
+| `MIDTRANS_SERVER_KEY` | Server-side Midtrans Sandbox signing and status API key | Required only to initialize Sandbox checkout/webhook | Obtain from Midtrans Sandbox account; server only | Yes |
+| `MIDTRANS_CLIENT_KEY` | Public Sandbox key returned only to the verified winning user for Snap.js | Required only to initialize checkout | Obtain from Midtrans Sandbox account; returned to authorized winner | Treat as public key |
+| `MIDTRANS_IS_PRODUCTION` | Sandbox safety switch; payment service requires exact value `false` | Required to enable Sandbox payments | `false`; production mode is rejected | No |
+| `MIDTRANS_PAYMENT_EXPIRY_HOURS` | Snap payment session expiry, 1–72 hours; defaults to 24 | Optional | `24` | No |
 | `NODE_ENV` | Controls runtime behavior, dotenv loading, and seed safety | Optional | `development`, `test`, or `production` | No |
 
 When `DATABASE_URL` is absent, the server requires `DB_NAME` and `DB_USERNAME`; `DB_PASSWORD` may be empty, and host/port have local defaults. The current `DB_SSL=true` Sequelize option requests TLS but sets `rejectUnauthorized: false`; confirm whether the production database connection policy requires stronger certificate verification.
 
 On the specified production topology, use the Supabase PostgreSQL URL as a server-side secret and enable `DB_SSL=true`. Set `CLIENT_ORIGIN` to the exact frontend origin. Do not put these values into Vercel's `VITE_*` variables.
+
+Midtrans integration is deliberately Sandbox-only. Set the server key and client key from the Midtrans Sandbox dashboard, and set `MIDTRANS_IS_PRODUCTION=false`. The backend refuses any other value and creates the official SDK client with `isProduction: false`. Never provide production keys or enable production payment mode for this project. Configure the Midtrans Sandbox notification URL to the deployed HTTPS endpoint `/payments/midtrans/notifications`; the backend independently verifies notification signature and queries Midtrans status. Do not expose the server key to the browser or logs.
 
 ## Demo seed (`server/`)
 

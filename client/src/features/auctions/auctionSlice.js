@@ -36,6 +36,7 @@ const initialState = {
     resyncReason: null,
     bidsRequestId: null,
     aiRequestId: null,
+    payment: { record: null, clientKey: null, status: 'idle', actionStatus: 'idle', error: null },
     currentId: null,
     requestId: null,
   },
@@ -246,6 +247,30 @@ export const loadBids = createAsyncThunk(
       return { bids, meta: normalizePageMeta(response.data?.meta || result?.meta, page, limit, bids.length), auctionId: String(auctionId), page };
     } catch (error) {
       return rejectWithValue('Gagal memuat riwayat bid.');
+    }
+  }
+);
+
+export const loadAuctionPayment = createAsyncThunk(
+  'auction/loadAuctionPayment',
+  async (auctionId, { rejectWithValue }) => {
+    try {
+      const response = await api.get(`/auctions/${auctionId}/payments`);
+      return { ...getApiData(response), auctionId: String(auctionId) };
+    } catch (error) {
+      return rejectWithValue(requestError(error, 'Status pembayaran gagal dimuat.'));
+    }
+  }
+);
+
+export const beginAuctionPayment = createAsyncThunk(
+  'auction/beginAuctionPayment',
+  async (auctionId, { rejectWithValue }) => {
+    try {
+      const response = await api.post(`/auctions/${auctionId}/payments`);
+      return { ...getApiData(response), auctionId: String(auctionId), httpStatus: response.status };
+    } catch (error) {
+      return rejectWithValue(requestError(error, 'Pembayaran belum dapat dimulai.'));
     }
   }
 );
@@ -544,6 +569,7 @@ const auctionSlice = createSlice({
           state.active.aiMeta = null;
           state.active.bidsRequestId = null;
           state.active.aiRequestId = null;
+          state.active.payment = { record: null, clientKey: null, status: 'idle', actionStatus: 'idle', error: null };
           state.active.submitStatus = 'idle';
           state.active.resyncRequired = false;
           state.active.resyncReason = null;
@@ -625,6 +651,33 @@ const auctionSlice = createSlice({
       .addCase(loadBids.rejected, (state, action) => {
         if (state.active.bidsRequestId === action.meta.requestId) state.active.bidsRequestId = null;
       })
+      .addCase(loadAuctionPayment.pending, (state, action) => {
+        if (sameId(state.active.currentId, action.meta.arg)) state.active.payment.status = 'loading';
+      })
+      .addCase(loadAuctionPayment.fulfilled, (state, action) => {
+        if (!sameId(state.active.currentId, action.payload.auctionId)) return;
+        state.active.payment = { ...state.active.payment, record: action.payload.payment ?? null, clientKey: action.payload.clientKey ?? null, status: 'success', error: null };
+      })
+      .addCase(loadAuctionPayment.rejected, (state, action) => {
+        if (!sameId(state.active.currentId, action.meta.arg)) return;
+        state.active.payment.status = 'error';
+        state.active.payment.error = action.payload;
+      })
+      .addCase(beginAuctionPayment.pending, (state, action) => {
+        if (sameId(state.active.currentId, action.meta.arg)) {
+          state.active.payment.actionStatus = 'loading';
+          state.active.payment.error = null;
+        }
+      })
+      .addCase(beginAuctionPayment.fulfilled, (state, action) => {
+        if (!sameId(state.active.currentId, action.payload.auctionId)) return;
+        state.active.payment = { ...state.active.payment, record: action.payload.payment ?? null, clientKey: action.payload.clientKey ?? null, status: 'success', actionStatus: 'success', error: null };
+      })
+      .addCase(beginAuctionPayment.rejected, (state, action) => {
+        if (!sameId(state.active.currentId, action.meta.arg)) return;
+        state.active.payment.actionStatus = 'error';
+        state.active.payment.error = action.payload;
+      })
       .addCase('auth/logout', (state) => {
         state.catalog.auctions = [];
         state.catalog.meta = initialState.catalog.meta;
@@ -692,6 +745,7 @@ export const selectActiveResyncReason = (state) => state.auction.active.resyncRe
 export const selectActiveBidsMeta = (state) => state.auction.active.bidsMeta;
 export const selectActiveBidsRequestId = (state) => state.auction.active.bidsRequestId;
 export const selectActiveAIMeta = (state) => state.auction.active.aiMeta;
+export const selectAuctionPayment = (state) => state.auction.active.payment;
 export const selectCurrentPrice = (state) => state.auction.active.auction?.currentPrice ?? null;
 export const selectNextMinimumBid = (state) => state.auction.active.auction?.nextMinimumBid ?? null;
 export const selectAuctionStatus = (state) => state.auction.active.auction?.status ?? null;

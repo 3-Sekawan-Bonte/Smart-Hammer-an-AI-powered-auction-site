@@ -3,7 +3,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 const http = require('node:http');
 const app = require('./app');
-const { sequelize, User, Auction, Bid, AIInteraction } = require('./models');
+const { sequelize, User, Auction, Bid, AIInteraction, Payment } = require('./models');
 const { createAuctionClosureService } = require('./services/auctionClosureService');
 const { createAuctionClosureScheduler } = require('./services/auctionClosureScheduler');
 const { createAIInteractionService } = require('./services/aiInteractionService');
@@ -15,7 +15,7 @@ const port = Number(process.env.PORT || 3000);
 
 const eventPublisher = createAuctionEventPublisher();
 const auctioneer = createAuctioneerService({ AIInteraction, eventPublisher });
-const dependencies = { sequelize, User, Auction, Bid, AIInteraction, eventPublisher, auctioneer, env: process.env };
+const dependencies = { sequelize, User, Auction, Bid, AIInteraction, Payment, eventPublisher, auctioneer, env: process.env };
 
 const httpServer = http.createServer(app.createApp(dependencies));
 const allowedOrigins = String(process.env.CLIENT_ORIGIN || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173,http://127.0.0.1:5173'))

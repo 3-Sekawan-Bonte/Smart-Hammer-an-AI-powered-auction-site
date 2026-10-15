@@ -128,6 +128,48 @@ Success `data.interaction` includes IDs, kind/visibility, question, answer, miss
 
 Query: `page` default 1; `limit` default 10, maximum 50. Returns only the caller's private questions and public Auctioneer commentary, newest first, with pagination metadata. Other users' private questions/answers/sources are excluded.
 
+## Winner payments (Midtrans Sandbox only)
+
+Payment routes use the same `/auctions` prefix and `Authorization: Bearer <accessToken>` header as other protected auction routes. Only the verified winner of an ended auction can access its payment. The backend takes the amount from persisted auction/bid state; client-supplied payment fields are not accepted. Checkout is limited to BCA Virtual Account (`bca_va`) and Mandiri Bill Payment (`echannel`). Browser checkout callbacks do not mark an order paid.
+
+### `POST /auctions/:id/payments` — authenticated winner
+
+Path parameter `id` is a positive integer auction ID. Query parameters: none. Body: empty; an empty JSON object is accepted, unknown body fields are rejected.
+
+The backend verifies the caller is the persisted winner, creates a unique server-side order at the final auction price, then requests a Snap token from Sandbox. A new payment returns HTTP 201; an existing pending/paid payment is reused and returns HTTP 200. `data.payment` includes `id`, `auctionId`, `orderId`, integer `amount`, `currency`, `paymentMethod`, `transactionId`, `status`, provider status, expiry and timestamps. For pending winner payments only, it also includes `snapToken` and `redirectUrl`; `data.clientKey` contains the public Sandbox client key. The server key is never returned.
+
+```bash
+curl -X POST "http://localhost:3000/auctions/123/payments" \
+  -H "Authorization: Bearer <WINNER_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Relevant errors: 400 `VALIDATION_ERROR`; 401 `UNAUTHORIZED`; 404 `NOT_FOUND` for missing auction or non-winner (intentionally hidden); 409 `PAYMENT_PROCESSING` or `PAYMENT_STATUS_REFRESH_REQUIRED`; 503 `PAYMENT_CONFIGURATION_ERROR` or `PAYMENT_UNAVAILABLE`. Midtrans calls have a 10-second client timeout.
+
+### `GET /auctions/:id/payments` — authenticated winner
+
+Path parameter `id`: positive integer auction ID. Query parameters: none. No request body is required. Returns HTTP 200 with `{ "payment": <payment|null>, "clientKey": <string|null> }`. If a payment is pending, the backend checks Midtrans status and persists any verified update before responding. Checkout token and public client key are returned only for the verified winner while payment remains pending. If no attempt exists, payment and client key are null.
+
+```bash
+curl "http://localhost:3000/auctions/123/payments" \
+  -H "Authorization: Bearer <WINNER_JWT>"
+```
+
+Relevant errors: 400 `VALIDATION_ERROR`; 401 `UNAUTHORIZED`; 404 `NOT_FOUND` for missing auction or non-winner; 500 `INTERNAL_ERROR` for an unexpected database failure. A temporary Midtrans status lookup failure leaves the persisted status intact and returns that state for refresh/retry.
+
+### `POST /payments/midtrans/notifications` — Midtrans Sandbox webhook
+
+This provider endpoint is mounted outside `/auctions`. No user JWT is required. Midtrans sends JSON fields including `order_id`, `status_code`, `gross_amount`, and `signature_key`; client-provided fields are not trusted. The backend validates the signature using the server-side Sandbox key and independently fetches current status from Midtrans before persisting a status update. It returns HTTP 200 after processing. Invalid signature returns 401 `MIDTRANS_SIGNATURE_INVALID`; amount/status mismatch returns 400; provider verification outage returns 503. Do not expose this server key to a browser.
+
+```bash
+curl -X POST "http://localhost:3000/payments/midtrans/notifications" \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":"<MIDTRANS_ORDER_ID>","status_code":"201","gross_amount":"275000.00","signature_key":"<MIDTRANS_SIGNATURE>"}'
+```
+
+Configure the Sandbox notification URL to `https://<backend-host>/payments/midtrans/notifications`. A local backend requires a publicly reachable HTTPS tunnel for Midtrans to call it; do not expose production payment credentials.
+
 ## Common errors
 
 | HTTP | Code | Meaning |
